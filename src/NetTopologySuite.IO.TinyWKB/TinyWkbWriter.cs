@@ -5,8 +5,21 @@ using NetTopologySuite.Geometries;
 
 namespace NetTopologySuite.IO
 {
-    public class TinyWkbWriter
+    public partial class TinyWkbWriter
     {
+
+        public int PrecisionXY { get; set; }
+
+        public int PrecisionZ { get; set; }
+
+        public int PrecisionM { get; set; }
+
+        public bool EmitBoundingBox { get; }
+
+        public bool EmitZ { get; }
+        
+        public bool EmitM { get; }
+
         public byte[] Write(Geometry geometry)
         {
             using (var ms = new MemoryStream())
@@ -24,31 +37,64 @@ namespace NetTopologySuite.IO
 
         private void Write(Geometry geometry, BinaryWriter writer)
         {
-            writer.Write((byte)ToTinyWkbType(geometry.OgcGeometryType));
+            writer.Write(ToHeader(geometry.OgcGeometryType));
+            writer.Write(ToMetadataHeader(geometry));
+            if (EmitZ || EmitM)
+                writer.Write(ToExtPrecInfo(geometry));
+
+            if (/*size*/ false)
+            {
+                //Write size
+            }
+
+            var csWriter = new CoordinateSequenceWriter(this, geometry);
 
         }
 
-        private TinyWkbGeometryType ToTinyWkbType(OgcGeometryType type)
+        private byte ToHeader(OgcGeometryType type)
         {
+            byte res;
             switch (type)
             {
                 case OgcGeometryType.Point:
-                    return TinyWkbGeometryType.Point;
+                    res = (byte)TinyWkbGeometryType.Point;
+                    break;
                 case OgcGeometryType.LineString:
-                    return TinyWkbGeometryType.LineString;
+                    res = (byte)TinyWkbGeometryType.LineString;
+                    break;
                 case OgcGeometryType.Polygon:
-                    return TinyWkbGeometryType.Polygon;
+                    res = (byte)TinyWkbGeometryType.Polygon;
+                    break;
                 case OgcGeometryType.MultiPoint:
-                    return TinyWkbGeometryType.MultiPoint;
+                    res = (byte)TinyWkbGeometryType.MultiPoint;
+                    break;
                 case OgcGeometryType.MultiLineString:
-                    return TinyWkbGeometryType.MultiLineString;
+                    res = (byte)TinyWkbGeometryType.MultiLineString;
+                    break;
                 case OgcGeometryType.MultiPolygon:
-                    return TinyWkbGeometryType.MultiPolygon;
+                    res = (byte)TinyWkbGeometryType.MultiPolygon;
+                    break;
                 case OgcGeometryType.GeometryCollection:
-                    return TinyWkbGeometryType.GeometryCollection;
+                    res = (byte)TinyWkbGeometryType.GeometryCollection;
+                    break;
                 default:
                     throw new NotSupportedException();
             }
+            return (byte)(res | (PrecisionXY << 4));
+        }
+
+        private byte ToMetadataHeader(Geometry geometry)
+        {
+            return new MetadataHeader(
+                geometry.OgcGeometryType != OgcGeometryType.Point,
+                false, false,
+                EmitZ | EmitM,
+                geometry.IsEmpty).Value;
+        }
+
+        private byte ToExtPrecInfo(Geometry geometry)
+        {
+            throw new NotImplementedException();
         }
     }
 }

@@ -4,6 +4,8 @@
 // VarintConverter was created and is maintained by
 // Tomáš Pastorek (https://github.com/topas).
 // It was released under BSD license
+using System.Buffers;
+
 namespace System
 {
     internal class VarintBitConverter
@@ -78,7 +80,7 @@ namespace System
         /// <returns>Varint array of bytes.</returns>
         public static byte[] GetVarintBytes(ulong value)
         {
-            var buffer = new byte[10];
+            var buffer = ArrayPool<byte>.Shared.Rent(10);
             var pos = 0;
             do
             {
@@ -96,10 +98,44 @@ namespace System
 
             var result = new byte[pos];
             Buffer.BlockCopy(buffer, 0, result, 0, pos);
+            ArrayPool<byte>.Shared.Return(buffer);
 
             return result;
         }
 
+        /// <summary>
+        /// Writes the specified 64-bit value as varint encoded array of bytes to <paramref name="buffer"/>.   
+        /// </summary>
+        /// <param name="value">64-bit unsigned value</param>
+        /// <param name="buffer">The buffer to write to</param>
+        /// <param name="offset">The offset to start at</param>
+        /// <returns>Number of bytes written.</returns>
+        public static void WriteVarintBytesToBuffer(IO.BinaryWriter writer, long value)
+        {
+            long zigzag = EncodeZigZag(value, 64);
+            WriteVarintBytesToBuffer(writer, (ulong)zigzag);
+        }
+
+        /// <summary>
+        /// Writes the specified 64-bit unsigned value as varint encoded array of bytes to <paramref name="buffer"/>.   
+        /// </summary>
+        /// <param name="value">64-bit unsigned value</param>
+        /// <returns>Number of bytes written.</returns>
+        public static void WriteVarintBytesToBuffer(IO.BinaryWriter writer, ulong value)
+        {
+            do
+            {
+                var byteVal = value & 0x7f;
+                value >>= 7;
+
+                if (value != 0)
+                {
+                    byteVal |= 0x80;
+                }
+                writer.Write((byte)byteVal);
+
+            } while (value != 0);
+        }
         /// <summary>
         /// Returns byte value from varint encoded array of bytes.
         /// </summary>
