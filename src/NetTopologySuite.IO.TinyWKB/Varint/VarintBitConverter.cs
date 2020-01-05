@@ -104,11 +104,10 @@ namespace System
         }
 
         /// <summary>
-        /// Writes the specified 64-bit value as varint encoded array of bytes to <paramref name="buffer"/>.   
+        /// Writes the specified 64-bit value as varint encoded array of bytes using <paramref name="writer"/>.   
         /// </summary>
+        /// <param name="writer">A binary writer</param>
         /// <param name="value">64-bit unsigned value</param>
-        /// <param name="buffer">The buffer to write to</param>
-        /// <param name="offset">The offset to start at</param>
         /// <returns>Number of bytes written.</returns>
         public static void WriteVarintBytesToBuffer(IO.BinaryWriter writer, long value)
         {
@@ -117,8 +116,9 @@ namespace System
         }
 
         /// <summary>
-        /// Writes the specified 64-bit unsigned value as varint encoded array of bytes to <paramref name="buffer"/>.   
+        /// Writes the specified 64-bit unsigned value as varint encoded array of bytes using <paramref name="writer"/>.   
         /// </summary>
+        /// <param name="writer">A binary writer</param>
         /// <param name="value">64-bit unsigned value</param>
         /// <returns>Number of bytes written.</returns>
         public static void WriteVarintBytesToBuffer(IO.BinaryWriter writer, ulong value)
