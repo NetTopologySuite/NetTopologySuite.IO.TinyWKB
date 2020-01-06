@@ -93,24 +93,21 @@ namespace NetTopologySuite.IO
 
         private void Write(BinaryWriter writer, Geometry geometry)
         {
-            var header = ToHeader(geometry.OgcGeometryType);
-            var mdhFlags = ToMetadataHeader(geometry, out var epi);
-
-            writer.Write(header.Value);
-            writer.Write(mdhFlags.Value);
-            if (mdhFlags.HasExtendedPrecisionInformation) writer.Write(epi.Value);
+            // Create and write header
+            var header = ToHeader(geometry);
+            TinyWkbHeader.Write(writer, header);
 
             // If geometry is empty, no more information needs to be written.
             if (geometry.IsEmpty) return;
 
             // If we need to emit size, write geometry information to memory stream
-            if (EmitSize)
+            if (header.HasSize)
             {
                 using (var ms = new MemoryStream())
                 {
                     using (var geomWriter = new BinaryWriter(ms, Encoding.UTF8, true))
                     {
-                        WriteGeometry(geomWriter, header, mdhFlags, epi, geometry);
+                        WriteGeometry(geomWriter, header, geometry);
                     }
                     writer.Write(VarintBitConverter.GetVarintBytes(ms.Length));
                     writer.Write(ms.GetBuffer(), 0, (int)ms.Position);
@@ -119,19 +116,19 @@ namespace NetTopologySuite.IO
             // If not, just write geometry
             else
             {
-                WriteGeometry(writer, header, mdhFlags, epi, geometry);
+                WriteGeometry(writer, header, geometry);
             }
         }
 
-        private void WriteGeometry(BinaryWriter writer, Header header, MetadataHeader mdhFlags, ExtendedPrecisionInformation epi, Geometry geometry)
+        private void WriteGeometry(BinaryWriter writer, TinyWkbHeader header, Geometry geometry)
         {
             if (geometry.OgcGeometryType == OgcGeometryType.GeometryCollection)
             {
-                WriteGeometryCollection(writer, header, mdhFlags, epi, (GeometryCollection)geometry);
+                WriteGeometryCollection(writer, header, (GeometryCollection)geometry);
                 return;
             }
 
-            var csWriter = new CoordinateSequenceWriter(header, mdhFlags, epi);
+            var csWriter = new CoordinateSequenceWriter(header);
             double[] initialLast = new double[csWriter.Dimension];//System.Buffers.ArrayPool<double>.Shared.Rent(csWriter.Dimension);
             switch (geometry.OgcGeometryType)
             {
@@ -175,7 +172,7 @@ namespace NetTopologySuite.IO
         private void WritePolygon(BinaryWriter writer, CoordinateSequenceWriter csWriter, Polygon polygon, double[] last, bool omitBoundingBox = false)
         {
             if (!omitBoundingBox) WriteBoundingBox(writer, csWriter, polygon);
-            writer.Write(VarintBitConverter.GetVarintBytes(1 + polygon.NumInteriorRings));
+            writer.Write(VarintBitConverter.GetVarintBytes((uint)(1 + polygon.NumInteriorRings)));
             csWriter.Write(writer, polygon.Shell.CoordinateSequence, last, 1);
             for (int i = 0; i < polygon.NumInteriorRings; i++)
                 csWriter.Write(writer, polygon.GetInteriorRingN(i).CoordinateSequence, last, 1);
@@ -184,7 +181,7 @@ namespace NetTopologySuite.IO
         private void WriteMultiPoint(BinaryWriter writer, CoordinateSequenceWriter csWriter, MultiPoint multiPoint, double[] last)
         {
             WriteBoundingBox(writer, csWriter, multiPoint);
-            writer.Write(VarintBitConverter.GetVarintBytes(multiPoint.NumGeometries));
+            writer.Write(VarintBitConverter.GetVarintBytes((uint)multiPoint.NumGeometries));
             WriteIdList(writer, multiPoint);
             for (int i = 0; i < multiPoint.NumGeometries; i++)
                 csWriter.Write(writer, ((Point)multiPoint.GetGeometryN(i)).CoordinateSequence, last, 0);
@@ -193,7 +190,7 @@ namespace NetTopologySuite.IO
         private void WriteMultiLineString(BinaryWriter writer, CoordinateSequenceWriter csWriter, MultiLineString multiLineString, double[] last)
         {
             WriteBoundingBox(writer, csWriter, multiLineString);
-            writer.Write(VarintBitConverter.GetVarintBytes(multiLineString.NumGeometries));
+            writer.Write(VarintBitConverter.GetVarintBytes((uint)multiLineString.NumGeometries));
             WriteIdList(writer, multiLineString);
             for (int i = 0; i < multiLineString.NumGeometries; i++)
                 csWriter.Write(writer, ((LineString)multiLineString.GetGeometryN(i)).CoordinateSequence, last, 0);
@@ -202,20 +199,20 @@ namespace NetTopologySuite.IO
         private void WriteMultiPolygon(BinaryWriter writer, CoordinateSequenceWriter csWriter, MultiPolygon multiPolygon, double[] last)
         {
             WriteBoundingBox(writer, csWriter, multiPolygon);
-            writer.Write(VarintBitConverter.GetVarintBytes(multiPolygon.NumGeometries));
+            writer.Write(VarintBitConverter.GetVarintBytes((uint)multiPolygon.NumGeometries));
             WriteIdList(writer, multiPolygon);
             for (int i = 0; i < multiPolygon.NumGeometries; i++)
                 WritePolygon(writer, csWriter, (Polygon)multiPolygon.GetGeometryN(i), last, true);
         }
 
-        private void WriteGeometryCollection(BinaryWriter writer, Header header, MetadataHeader mdhFlags, ExtendedPrecisionInformation epi, GeometryCollection gc)
+        private void WriteGeometryCollection(BinaryWriter writer, TinyWkbHeader header, GeometryCollection gc)
         {
-            var csWriter = new CoordinateSequenceWriter(header, mdhFlags, epi);
+            var csWriter = new CoordinateSequenceWriter(header);
             WriteBoundingBox(writer, csWriter, gc);
-            writer.Write(VarintBitConverter.GetVarintBytes(gc.NumGeometries));
+            writer.Write(VarintBitConverter.GetVarintBytes((uint)gc.NumGeometries));
             WriteIdList(writer, gc);
             for (int i = 0; i < gc.NumGeometries; i++)
-                WriteGeometry(writer, header, mdhFlags, epi, gc.GetGeometryN(i));
+                Write(writer, gc.GetGeometryN(i));
         }
 
         private void WriteBoundingBox(BinaryWriter writer, CoordinateSequenceWriter csWriter, Geometry geometry)
@@ -300,66 +297,45 @@ namespace NetTopologySuite.IO
         }
 
 
-        private Header ToHeader(OgcGeometryType type)
+        private TinyWkbHeader ToHeader(Geometry geometry)
         {
-            TinyWkbGeometryType res;
-            switch (type)
+            TinyWkbGeometryType type;
+            switch (geometry.OgcGeometryType)
             {
                 case OgcGeometryType.Point:
-                    res = TinyWkbGeometryType.Point;
+                    type = TinyWkbGeometryType.Point;
                     break;
                 case OgcGeometryType.LineString:
-                    res = TinyWkbGeometryType.LineString;
+                    type = TinyWkbGeometryType.LineString;
                     break;
                 case OgcGeometryType.Polygon:
-                    res = TinyWkbGeometryType.Polygon;
+                    type = TinyWkbGeometryType.Polygon;
                     break;
                 case OgcGeometryType.MultiPoint:
-                    res = TinyWkbGeometryType.MultiPoint;
+                    type = TinyWkbGeometryType.MultiPoint;
                     break;
                 case OgcGeometryType.MultiLineString:
-                    res = TinyWkbGeometryType.MultiLineString;
+                    type = TinyWkbGeometryType.MultiLineString;
                     break;
                 case OgcGeometryType.MultiPolygon:
-                    res = TinyWkbGeometryType.MultiPolygon;
+                    type = TinyWkbGeometryType.MultiPolygon;
                     break;
                 case OgcGeometryType.GeometryCollection:
-                    res = TinyWkbGeometryType.GeometryCollection;
+                    type = TinyWkbGeometryType.GeometryCollection;
                     break;
                 default:
                     throw new NotSupportedException();
             }
-            return new Header(res, PrecisionXY);
-        }
 
-        private MetadataHeader ToMetadataHeader(Geometry geometry, out ExtendedPrecisionInformation epi)
-        {
-            Coordinate c = geometry.Coordinate;
-            bool hasZ = false, hasM = false;
-            int dimension = Coordinates.Dimension(c);
-            if (dimension > 2)
-            {
-                int measures = Coordinates.Measures(c);
-                if (dimension == 3 && measures == 0)
-                    hasZ = true;
-                else if (dimension == 3 && measures == 1)
-                    hasM = true;
-                else {
-                    hasZ = true;
-                    hasM = true;
-                }
-            }
+            // Test if we have z- or m-ordinate values
+            var c = geometry.Coordinate;
+            bool hasZ = c is CoordinateZ && !double.IsNaN(c.Z);
+            bool hasM = c is CoordinateM || c is CoordinateZM;
 
-            hasZ &= EmitZ;
-            hasM &= EmitM;
-            
-            epi = (hasZ | hasM) ? new ExtendedPrecisionInformation(hasZ, PrecisionZ, hasM, PrecisionM) : new ExtendedPrecisionInformation();
-
-            return new MetadataHeader(
-                geometry.OgcGeometryType != OgcGeometryType.Point,
-                EmitSize, EmitIdList,
-                (hasZ | hasM),
-                geometry.IsEmpty);
+            return new TinyWkbHeader(type, PrecisionXY, geometry.IsEmpty,
+                EmitBoundingBox, EmitSize, EmitIdList,
+                EmitZ & hasZ, PrecisionZ,
+                EmitM & hasM, PrecisionM);
         }
     }
 }

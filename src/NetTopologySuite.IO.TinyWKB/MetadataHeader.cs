@@ -1,5 +1,8 @@
+using System;
+
 namespace NetTopologySuite.IO
 {
+    [Obsolete("Use TinyWkbHeader", true)]
     internal struct MetadataHeader
     {
         private readonly byte _mh;

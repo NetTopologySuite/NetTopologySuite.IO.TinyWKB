@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.IO;
 using System.Runtime.CompilerServices;
@@ -21,26 +21,26 @@ namespace NetTopologySuite.IO
             private readonly double _descale12, _descale3, _descale4;
             private readonly int _dimension, _measures;
 
-            public CoordinateSequenceReader(CoordinateSequenceFactory coordinateSequenceFactory, Header header, MetadataHeader mdhFlags, ExtendedPrecisionInformation epInfo)
+            public CoordinateSequenceReader(CoordinateSequenceFactory coordinateSequenceFactory, TinyWkbHeader header)
             {
                 _coordinateSequenceFactory = coordinateSequenceFactory;
-                _descale12 = header.Descale;
-                if (!mdhFlags.HasExtendedPrecisionInformation || !(epInfo.HasZ | epInfo.HasM))
+                _descale12 = header.DescaleX();
+                if (!header.HasExtendedPrecisionInformation || !(header.HasZ | header.HasM))
                 {
                     _coordinateReaderFn = ReadCoordinate2;
                     _dimension = 2;
                     _coordinateAddFn = AddXY;
                 }
-                else if (epInfo.HasZ && !epInfo.HasM)
+                else if (header.HasZ && !header.HasM)
                 {
-                    _descale3 = Math.Pow(10, -epInfo.PrecisionZ);
+                    _descale3 = header.DescaleZ();
                     _coordinateReaderFn = ReadCoordinate3;
                     _dimension = 3;
                     _coordinateAddFn = AddXYZ;
                 }
-                else if (!epInfo.HasZ && epInfo.HasM)
+                else if (!header.HasZ && header.HasM)
                 {
-                    _descale3 = Math.Pow(10, -epInfo.PrecisionM);
+                    _descale3 = header.DescaleM();
                     _coordinateReaderFn = ReadCoordinate3;
                     _dimension = 3;
                     _measures = 1;
@@ -48,8 +48,8 @@ namespace NetTopologySuite.IO
                 }
                 else
                 {
-                    _descale3 = Math.Pow(10, -epInfo.PrecisionZ);
-                    _descale4 = Math.Pow(10, -epInfo.PrecisionM);
+                    _descale3 = header.DescaleZ();
+                    _descale4 = header.DescaleM();
                     _coordinateReaderFn = ReadCoordinate4;
                     _dimension = 4;
                     _measures = 1;

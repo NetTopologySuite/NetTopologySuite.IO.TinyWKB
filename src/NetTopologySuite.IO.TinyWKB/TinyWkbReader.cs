@@ -38,6 +38,22 @@ namespace NetTopologySuite.IO
         }
 
         /// <summary>
+        /// Method to read a <see cref="Geometry"/> from a <see cref="buffer"/>.
+        /// </summary>
+        /// <param name="buffer">The input stream</param>
+        /// <param name="position"></param>
+        /// <returns>A geometry</returns>
+        public Geometry Read(byte[] buffer, long position = 0)
+        {
+            using (var ms = new MemoryStream(buffer))
+            {
+                if (position != 0)
+                    ms.Seek(position, SeekOrigin.Begin);
+                return Read(ms);
+            }
+        }
+
+        /// <summary>
         /// Method to read a <see cref="Geometry"/> from a <see cref="Stream"/>.
         /// </summary>
         /// <param name="stream">The input stream</param>
@@ -56,23 +72,18 @@ namespace NetTopologySuite.IO
         public Geometry Read(BinaryReader reader)
         {
             // Read the common, extended header information
-            var h = new Header(reader.ReadByte());
-            var mdhFlags = new MetadataHeader(reader.ReadByte());
-            var epInfo = mdhFlags.HasExtendedPrecisionInformation
-                ? new ExtendedPrecisionInformation(reader.ReadByte())
-                : new ExtendedPrecisionInformation();
+            var header = TinyWkbHeader.Read(reader);
 
-            ulong size = mdhFlags.HasSize ? ReadUVarint(reader) : 0;
-            if (mdhFlags.HasBoundingBox)
+            ulong size = header.HasSize ? ReadUVarint(reader) : 0;
+            if (header.HasBoundingBox)
             {
-                ReadBoundingBox(reader, h, mdhFlags, epInfo,
-                    out _, out _, out _);
+                ReadBoundingBox(reader, header, out _, out _, out _);
             }
 
             // Based on header information, build a coordinate sequence reader
-            var coordinateReader = new CoordinateSequenceReader(_factory.CoordinateSequenceFactory, h, mdhFlags, epInfo);
+            var coordinateReader = new CoordinateSequenceReader(_factory.CoordinateSequenceFactory, header);
             double[] last = null;
-            switch (h.GeometryType)
+            switch (header.GeometryType)
             {
                 case TinyWkbGeometryType.Point:
                     return ReadPoint(reader, coordinateReader);
@@ -81,13 +92,13 @@ namespace NetTopologySuite.IO
                 case TinyWkbGeometryType.Polygon:
                     return ReadPolygon(reader, coordinateReader, ref last);
                 case TinyWkbGeometryType.MultiPoint:
-                    return ReadMultiPoint(reader, mdhFlags, coordinateReader);
+                    return ReadMultiPoint(reader, header, coordinateReader);
                 case TinyWkbGeometryType.MultiLineString:
-                    return ReadMultiLineString(reader, mdhFlags, coordinateReader);
+                    return ReadMultiLineString(reader, header, coordinateReader);
                 case TinyWkbGeometryType.MultiPolygon:
-                    return ReadMultiPolygon(reader, mdhFlags, coordinateReader);
+                    return ReadMultiPolygon(reader, header, coordinateReader);
                 case TinyWkbGeometryType.GeometryCollection:
-                    return ReadGeometryCollection(reader, mdhFlags);
+                    return ReadGeometryCollection(reader, header);
             }
 
             throw new NotSupportedException();
@@ -130,10 +141,10 @@ namespace NetTopologySuite.IO
             return _factory.CreatePolygon(shell, holes);
         }
 
-        private MultiPoint ReadMultiPoint(BinaryReader reader, MetadataHeader mdhFlags, CoordinateSequenceReader csReader)
+        private MultiPoint ReadMultiPoint(BinaryReader reader, TinyWkbHeader header, CoordinateSequenceReader csReader)
         {
             int numPoints = (int) ReadUVarint(reader);
-            long[] idList = ReadIdList(reader, mdhFlags, numPoints);
+            long[] idList = ReadIdList(reader, header, numPoints);
             double[] last = null;
             var sequence = csReader.Read(reader, numPoints, ref last);
             var res = _factory.CreateMultiPoint(sequence);
@@ -142,10 +153,10 @@ namespace NetTopologySuite.IO
             return res;
         }
 
-        private MultiLineString ReadMultiLineString(BinaryReader reader, MetadataHeader mdhFlags, CoordinateSequenceReader csReader)
+        private MultiLineString ReadMultiLineString(BinaryReader reader, TinyWkbHeader header, CoordinateSequenceReader csReader)
         {
             int numLineStrings = (int)ReadUVarint(reader);
-            long[] idList = ReadIdList(reader, mdhFlags, numLineStrings);
+            long[] idList = ReadIdList(reader, header, numLineStrings);
             var lineStrings = new LineString[numLineStrings];
             double[] last = null;
             for (int i = 0; i < numLineStrings; i++)
@@ -156,10 +167,10 @@ namespace NetTopologySuite.IO
 
             return _factory.CreateMultiLineString(lineStrings);
         }
-        private MultiPolygon ReadMultiPolygon(BinaryReader reader, MetadataHeader mdhFlags, CoordinateSequenceReader csReader)
+        private MultiPolygon ReadMultiPolygon(BinaryReader reader, TinyWkbHeader header, CoordinateSequenceReader csReader)
         {
             int numPolygons = (int)ReadUVarint(reader);
-            long[] idList = ReadIdList(reader, mdhFlags, numPolygons);
+            long[] idList = ReadIdList(reader, header, numPolygons);
             var polygons = new Polygon[numPolygons];
 
             double[] last = null;
@@ -172,11 +183,11 @@ namespace NetTopologySuite.IO
             return _factory.CreateMultiPolygon(polygons);
         }
 
-        private GeometryCollection ReadGeometryCollection(BinaryReader reader, MetadataHeader mdhFlags)
+        private GeometryCollection ReadGeometryCollection(BinaryReader reader, TinyWkbHeader header)
         {
             int numGeometries = (int) ReadUVarint(reader);
             var geometries = new Geometry[numGeometries];
-            long[] idList = ReadIdList(reader, mdhFlags, numGeometries);
+            long[] idList = ReadIdList(reader, header, numGeometries);
             for (int i = 0; i < numGeometries; i++)
             {
                 geometries[i] = Read(reader);
@@ -186,35 +197,34 @@ namespace NetTopologySuite.IO
             return _factory.CreateGeometryCollection(geometries);
         }
 
-        private static void ReadBoundingBox(BinaryReader reader, Header h,
-            MetadataHeader mdhFlags, ExtendedPrecisionInformation epInfo,
+        private static void ReadBoundingBox(BinaryReader reader, TinyWkbHeader header,
             out Envelope envelope, out Interval zInterval, out Interval mInterval)
         {
-            envelope = ReadEnvelope(reader, h.Precision);
-            zInterval = mdhFlags.HasExtendedPrecisionInformation && epInfo.HasZ
-                ? ReadInterval(reader, epInfo.PrecisionZ)
+            envelope = ReadEnvelope(reader, header.DescaleX());
+            zInterval = header.HasExtendedPrecisionInformation && header.HasZ
+                ? ReadInterval(reader, header.DescaleZ())
                 : Interval.Create();
 
-            mInterval = mdhFlags.HasExtendedPrecisionInformation && epInfo.HasM
-                ? ReadInterval(reader, epInfo.PrecisionM)
+            mInterval = header.HasExtendedPrecisionInformation && header.HasM
+                ? ReadInterval(reader, header.DescaleM())
                 : Interval.Create();
         }
 
         private static Envelope ReadEnvelope(BinaryReader reader, double scale)
         {
             double xmin = ToDouble(ReadVarint(reader), scale);
-            double xmax = xmin += ToDouble(ReadVarint(reader), scale);
+            double xmax = xmin + ToDouble(ReadVarint(reader), scale);
             double ymin = ToDouble(ReadVarint(reader), scale);
-            double ymax = ymin += ToDouble(ReadVarint(reader), scale);
+            double ymax = ymin + ToDouble(ReadVarint(reader), scale);
 
             return new Envelope(xmin, xmax, ymin, ymax);
         }
 
-        private long[] ReadIdList(BinaryReader reader, MetadataHeader mdhFlags, int numGeometries)
+        private long[] ReadIdList(BinaryReader reader, TinyWkbHeader header, int numGeometries)
         {
             long[] res = new long[numGeometries];
             for (int i = 0; i < numGeometries; i++)
-                res[i] = mdhFlags.HasIdList ? ReadVarint(reader) : i;
+                res[i] = header.HasIdList ? ReadVarint(reader) : i;
             return res;
         }
 

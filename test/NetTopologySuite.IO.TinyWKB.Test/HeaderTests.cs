@@ -13,13 +13,14 @@ namespace NetTopologySuite.IO.Test
         [TestCase(TinyWkbGeometryType.MultiLineString, -1, 10d)]
         [TestCase(TinyWkbGeometryType.MultiPolygon, -1, 10d)]
         [TestCase(TinyWkbGeometryType.GeometryCollection, 4, 0.0001)]
-        public void Test(TinyWkbGeometryType type, int precision, double descale)
+        public void Test(byte type, int precision, double descale)
         {
-            var h = new Header(type, precision);
+            var h = new TinyWkbHeader((TinyWkbGeometryType)type, precision);
 
-            Assert.That(h.GeometryType, Is.EqualTo(type));
-            Assert.That(h.Precision, Is.EqualTo(precision));
-            Assert.That(h.Descale, Is.EqualTo(descale));
+            Assert.That(h.GeometryType, Is.EqualTo((TinyWkbGeometryType)type));
+            Assert.That(h.PrecisionXY, Is.EqualTo(precision));
+            Assert.That(h.DescaleX(), Is.EqualTo(descale));
+            Assert.That(h.DescaleY(), Is.EqualTo(descale));
         }
     }
 }

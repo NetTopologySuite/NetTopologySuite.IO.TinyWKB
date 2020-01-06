@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Buffers;
 using System.IO;
 using NetTopologySuite.Geometries;
@@ -15,21 +15,21 @@ namespace NetTopologySuite.IO
 
             private readonly WriteVarintsFn _writeVarintsFn;
 
-            public CoordinateSequenceWriter(Header header, MetadataHeader mdhFlags, ExtendedPrecisionInformation epi)
+            public CoordinateSequenceWriter(TinyWkbHeader header)
             {
                 int dimension = 2;
                 int measures = 0;
-                var scales = ArrayPool<double>.Shared.Rent(4);
-                scales[0] = scales[1] = header.Scale;
-                if (mdhFlags.HasExtendedPrecisionInformation)
+                double[] scales = ArrayPool<double>.Shared.Rent(4);
+                scales[0] = scales[1] = header.ScaleX();
+                if (header.HasExtendedPrecisionInformation)
                 {
-                    if (epi.HasZ)
+                    if (header.HasZ)
                     {
-                        scales[dimension++] = Math.Pow(10, epi.PrecisionZ);
+                        scales[dimension++] = header.ScaleZ();
                     }
-                    if (epi.HasM)
+                    if (header.HasM)
                     {
-                        scales[dimension++] = Math.Pow(10, epi.PrecisionZ);
+                        scales[dimension++] = header.ScaleM();
                         measures = 1;
                         if (dimension == 3)
                             _writeVarintsFn = WriteVarints2DM;
@@ -66,7 +66,7 @@ namespace NetTopologySuite.IO
 
                 int count = sequence.Count - omit;
                 if (count > 1)
-                    writer.Write(VarintBitConverter.GetVarintBytes(count));
+                    writer.Write(VarintBitConverter.GetVarintBytes((uint)count));
                 for(int i = 0; i < count; i++)
                     _writeVarintsFn(writer, sequence, i,  last);
             }

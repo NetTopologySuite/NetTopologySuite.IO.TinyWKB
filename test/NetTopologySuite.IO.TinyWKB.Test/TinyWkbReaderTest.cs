@@ -1,5 +1,7 @@
 using System;
+using System.Globalization;
 using System.IO;
+using System.Text;
 using NetTopologySuite.Geometries;
 using NUnit.Framework;
 
@@ -25,14 +27,30 @@ namespace NetTopologySuite.IO.Test
         public void TestsFromTwkbJs(string hexString, OgcGeometryType type)
         {
             Geometry g = null;
+            TinyWkbHeader header;
             using (var ms = new MemoryStream(WKBReader.HexToBytes(hexString)))
             {
                 ms.Seek(0, SeekOrigin.Begin);
-                Assert.That(() => g = _reader.Read(ms), Throws.Nothing);
-                Assert.That(g.OgcGeometryType, Is.EqualTo(type));
+                using (var br = new BinaryReader(ms, Encoding.UTF8, false))
+                {
+                    header = TinyWkbHeader.Read(br);
+
+                    ms.Seek(0, SeekOrigin.Begin);
+                    Assert.That(() => g = _reader.Read(br), Throws.Nothing);
+                    Assert.That(g.OgcGeometryType, Is.EqualTo(type));
+
+                }
             }
-            
-            Console.WriteLine($"Read '{g.AsText()}' from '{hexString}'.");
+
+            TestContext.WriteLine();
+            TestContext.WriteLine($"Read  '{g.AsText()}' from '{hexString}'.");
+
+            var wrtr = new TinyWkbWriter(precisionXY: header.PrecisionXY,
+                header.HasZ, header.PrecisionZ, header.HasM, header.PrecisionM,
+                header.HasSize, header.HasBoundingBox, header.HasIdList);
+            var data2 = wrtr.Write(g);
+            TestContext.WriteLine($"Write '{g.AsText()}' to '{TinyWkbWriterTest.ToHexString(data2)}'.");
+            TestContext.WriteLine(_reader.Read(data2));
         }
     }
 }

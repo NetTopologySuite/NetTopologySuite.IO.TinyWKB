@@ -1,5 +1,8 @@
+using System;
+
 namespace NetTopologySuite.IO
 {
+    [Obsolete("Use TinyWkbHeader", true)]
     internal struct ExtendedPrecisionInformation
     {
         private readonly byte _epi;
