@@ -7,6 +7,9 @@ using NetTopologySuite.Geometries;
 
 namespace NetTopologySuite.IO
 {
+    /// <summary>
+    /// A writer class to encode <see cref="Geometry"/> into TinyWKB format.
+    /// </summary>
     public partial class TinyWkbWriter
     {
         /// <summary>
@@ -76,6 +79,11 @@ namespace NetTopologySuite.IO
         /// </summary>
         public bool EmitIdList { get; }
 
+        /// <summary>
+        /// Function to write <paramref name="geometry"/> to an array of bytes.
+        /// </summary>
+        /// <param name="geometry">A geometry</param>
+        /// <returns><paramref name="geometry"/> encoded in an array of bytes</returns>
         public byte[] Write(Geometry geometry)
         {
             using (var ms = new MemoryStream())
@@ -85,13 +93,23 @@ namespace NetTopologySuite.IO
             }
         }
 
+        /// <summary>
+        /// Method to write <paramref name="geometry"/> TinyWKB encoded to a stream.
+        /// </summary>
+        /// <param name="stream">A stream</param>
+        /// <param name="geometry">A geometry</param>
         public void Write(Stream stream, Geometry geometry)
         {
             using (var writer = new BinaryWriter(stream, Encoding.UTF8, true))
                 Write(writer, geometry);
         }
 
-        private void Write(BinaryWriter writer, Geometry geometry)
+        /// <summary>
+        /// Method to write <paramref name="geometry"/> TinyWKB encoded using a binary writer.
+        /// </summary>
+        /// <param name="writer">A binary writer</param>
+        /// <param name="geometry">A geometry</param>
+        public void Write(BinaryWriter writer, Geometry geometry)
         {
             // Create and write header
             var header = ToHeader(geometry);

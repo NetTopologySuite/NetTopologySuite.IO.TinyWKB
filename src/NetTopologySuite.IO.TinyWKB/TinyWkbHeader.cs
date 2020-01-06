@@ -3,6 +3,9 @@ using System.IO;
 
 namespace NetTopologySuite.IO
 {
+    /// <summary>
+    /// TinyWKB header
+    /// </summary>
     public struct TinyWkbHeader
     {
         /// <summary>
@@ -24,6 +27,11 @@ namespace NetTopologySuite.IO
 
         private readonly int _value;
 
+        /// <summary>
+        /// Utility function to read the header using a binary reader
+        /// </summary>
+        /// <param name="reader">The binary reader to use</param>
+        /// <returns>The header</returns>
         public static TinyWkbHeader Read(BinaryReader reader)
         {
             byte header = reader.ReadByte();
@@ -33,6 +41,11 @@ namespace NetTopologySuite.IO
                 : new TinyWkbHeader(header, metadata);
         }
 
+        /// <summary>
+        /// Utility method to write a header using a binary writer
+        /// </summary>
+        /// <param name="writer">The binary writer to use</param>
+        /// <param name="header">The header</param>
         public static void Write(BinaryWriter writer, TinyWkbHeader header)
         {
             writer.Write((ushort)(0xffff & header._value));
@@ -60,8 +73,10 @@ namespace NetTopologySuite.IO
         /// <param name="hasBoundingBox">A flag indicating that the bounding box information should be written.</param>
         /// <param name="hasSize">A flag indicating that the size of the geometry data is part of the header.</param>
         /// <param name="hasIdList">A flag indicating that an id-list is written. This applies to multi-geometries only.</param>
-        /// <param name="hasZ">A flag indicating that m-ordinates are present</param>
-        /// <param name="precisionZ">The number of decimal places for m-ordinate values</param>
+        /// <param name="hasZ">A flag indicating that z-ordinates are present</param>
+        /// <param name="precisionZ">The number of decimal places for z-ordinate values</param>
+        /// <param name="hasM">A flag indicating that m-ordinates are present</param>
+        /// <param name="precisionM">The number of decimal places for m-ordinate values</param>
         public TinyWkbHeader(TinyWkbGeometryType geometryType, int precisionXY = 7,
             bool hasEmptyGeometry = false,
             bool hasBoundingBox = true, bool hasSize = false, bool hasIdList = false,

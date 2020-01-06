@@ -38,17 +38,18 @@ namespace NetTopologySuite.IO
         }
 
         /// <summary>
-        /// Method to read a <see cref="Geometry"/> from a <see cref="buffer"/>.
+        /// Method to read a <see cref="Geometry"/> from a <paramref name="buffer"/>. Optionally a starting position can be supplied.
         /// </summary>
         /// <param name="buffer">The input stream</param>
-        /// <param name="position"></param>
+        /// <param name="position">The starting position</param>
+        /// <param name="seekOrigin">A value indicating how to interpret <paramref name="position"/></param>
         /// <returns>A geometry</returns>
-        public Geometry Read(byte[] buffer, long position = 0)
+        public Geometry Read(byte[] buffer, long position = 0, SeekOrigin seekOrigin = SeekOrigin.Begin)
         {
             using (var ms = new MemoryStream(buffer))
             {
                 if (position != 0)
-                    ms.Seek(position, SeekOrigin.Begin);
+                    ms.Seek(position, seekOrigin);
                 return Read(ms);
             }
         }
@@ -74,7 +75,12 @@ namespace NetTopologySuite.IO
             // Read the common, extended header information
             var header = TinyWkbHeader.Read(reader);
 
-            ulong size = header.HasSize ? ReadUVarint(reader) : 0;
+            // Since we don't do anything with size just drop it
+            if (header.HasSize) ReadUVarint(reader);
+
+            // If we did sth. with size this would be correct.
+            /*ulong size = header.HasSize ? ReadUVarint(reader) : 0;*/
+
             if (header.HasBoundingBox)
             {
                 ReadBoundingBox(reader, header, out _, out _, out _);
