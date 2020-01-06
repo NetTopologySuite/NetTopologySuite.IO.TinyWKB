@@ -4,7 +4,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using NetTopologySuite.Geometries;
 
-[assembly: InternalsVisibleTo("NetTopologySuite.IO.TinyWKB.Test")]
+//[assembly: InternalsVisibleTo("NetTopologySuite.IO.TinyWKB.Test")]
 
 namespace NetTopologySuite.IO
 {

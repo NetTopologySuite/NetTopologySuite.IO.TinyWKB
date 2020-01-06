@@ -8,7 +8,7 @@ using System.Text;
 using NetTopologySuite.DataStructures;
 using NetTopologySuite.Geometries;
 
-[assembly: InternalsVisibleTo("NetTopologySuite.IO.TinyWKB.Test")]
+//[assembly: InternalsVisibleTo("NetTopologySuite.IO.TinyWKB.Test")]
 
 namespace NetTopologySuite.IO
 {

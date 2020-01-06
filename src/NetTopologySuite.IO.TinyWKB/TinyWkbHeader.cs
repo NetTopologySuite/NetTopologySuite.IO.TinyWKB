@@ -3,7 +3,7 @@ using System.IO;
 
 namespace NetTopologySuite.IO
 {
-    internal struct TinyWkbHeader
+    public struct TinyWkbHeader
     {
         /// <summary>
         /// Flag indicating that

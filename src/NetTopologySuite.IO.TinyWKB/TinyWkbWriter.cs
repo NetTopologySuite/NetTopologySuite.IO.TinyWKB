@@ -243,7 +243,7 @@ namespace NetTopologySuite.IO
             {
                 for (int i = 0; i < gc.Count; i++)
                 {
-                    var userData = gc.GetGeometryN(i)?.UserData;
+                    object userData = gc.GetGeometryN(i)?.UserData;
                     if (userData is IConvertible convertibleUserData)
                         idList[i] = convertibleUserData.ToInt64(NumberFormatInfo.InvariantInfo);
                     else

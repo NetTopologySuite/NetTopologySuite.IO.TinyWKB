@@ -102,7 +102,7 @@ namespace NetTopologySuite.IO
             public static void WriteOrdinate(BinaryWriter writer, double value, double scale, ref double lastScaledValue)
             {
                 value = Math.Round(value * scale, 0, MidpointRounding.AwayFromZero);
-                var valueEnc = value - lastScaledValue;
+                double valueEnc = value - lastScaledValue;
                 lastScaledValue = value;
                 VarintBitConverter.WriteVarintBytesToBuffer(writer, (long)valueEnc);
             }

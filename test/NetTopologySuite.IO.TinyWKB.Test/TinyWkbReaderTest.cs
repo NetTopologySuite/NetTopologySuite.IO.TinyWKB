@@ -48,7 +48,7 @@ namespace NetTopologySuite.IO.Test
             var wrtr = new TinyWkbWriter(precisionXY: header.PrecisionXY,
                 header.HasZ, header.PrecisionZ, header.HasM, header.PrecisionM,
                 header.HasSize, header.HasBoundingBox, header.HasIdList);
-            var data2 = wrtr.Write(g);
+            byte[] data2 = wrtr.Write(g);
             TestContext.WriteLine($"Write '{g.AsText()}' to '{TinyWkbWriterTest.ToHexString(data2)}'.");
             TestContext.WriteLine(_reader.Read(data2));
         }

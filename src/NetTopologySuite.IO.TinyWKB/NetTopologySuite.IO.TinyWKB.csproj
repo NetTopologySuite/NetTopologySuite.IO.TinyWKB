@@ -1,16 +1,28 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <RootNamespace>NetTopologySuite.IO</RootNamespace>
+    <SignAssembly>true</SignAssembly>
   </PropertyGroup>
 
+  <PropertyGroup Label="Assembly Info">
+    <AssemblyTitle>NetTopologySuite.IO.TinyWKB</AssemblyTitle>
+  </PropertyGroup>
 
-  <ItemGroup Condition=" '$(WithGeoAPI)' == 'true' ">
-    <PackageReference Include="GeoAPI" Version="1.7.5" />
-  </ItemGroup>
-  <ItemGroup Condition=" '$(WithGeoAPI)' != 'true' ">
-    <PackageReference Include="NetTopologySuite" Version="2.0.0" />
+  <PropertyGroup Label="NuGet Package Info">
+    <PackageId>NetTopologySuite.IO.TinyWKB</PackageId>
+    <Title>NTS - Topology Suite - IO Library for TinyWKB</Title>
+    <Authors>Felix Obermaier</Authors>
+    <Owners>NetTopologySuite - Team</Owners>
+    <PackageLicenseExpression>BSD-3-Clause</PackageLicenseExpression>
+    <PackageIconUrl>https://raw.githubusercontent.com/NetTopologySuite/GeoAPI/master/icon.png</PackageIconUrl>
+    <Description>This package contains the TinyWKB IO library.</Description>
+    <PackageTags>NTS;TWKB;TinyWKB</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NetTopologySuite" Version="[2.0.0, 3.0.0-A)" />
   </ItemGroup>
 
 </Project>
