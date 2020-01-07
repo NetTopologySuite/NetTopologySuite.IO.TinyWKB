@@ -18,6 +18,14 @@ jobs:
     - name: Test with dotnet
       run: dotnet test --configuration Release
     - name: Pack with dotnet
+      if: success() && endswith(github.ref, 'master')
       run: dotnet pack --configuration Release
+    - name: Setup Nuget.exe
+      if: success() && endswith(github.ref, 'master')
+      uses: nuget/setup-nuget@v1
+    - name: Add GPR Source using nuget.exe
+      if: success() && endswith(github.ref, 'master')
+      run: nuget sources add -name "GPR" -Source https://nuget.pkg.github.com/nettopologysuite/index.json -Username FObermaier -Password ${{ secrets.GITHUB_TOKEN }} 
     - name: Push with dotnet
-      run: dotnet nuget push --force-english-output -k ${{secrets.GITHUB_TOKEN}} **/NetTopologySuite.IO.TinyWKB.*.nupkg -s https://nuget.pkg.github.com/nettopologysuite/index.json
+      if: success() && endswith(github.ref, 'master')
+      run: nuget push **/NetTopologySuite.IO.TinyWKB.*.nupkg -source "GPR" -SkipDuplicate 
