@@ -1,9 +1,9 @@
 # NetTopologySuite.IO.TinyWKB
 An IO module for NTS to read and write geometries in the [Tiny Well-Known-Binary](https://github.com/TWKB/Specification/blob/master/twkb.md) format.
 
-| License | Travis | NuGet | MyGet (pre-release) |
-| ------- | ------ | ----- | ------------------- |
-| [![License](https://img.shields.io/github/license/NetTopologySuite/NetTopologySuite.IO.TinyWKB.svg)](https://github.com/NetTopologySuite/NetTopologySuite.IO.TinyWKB/blob/master/LICENSE.md) | [![Travis](https://travis-ci.org/NetTopologySuite/NetTopologySuite.IO.TinyWKB.svg?branch=master)](https://travis-ci.org/NetTopologySuite/NetTopologySuite.IO.TinyWKB) | [![NuGet](https://img.shields.io/nuget/v/NetTopologySuite.IO.TinyWKB.svg)](https://www.nuget.org/packages/NetTopologySuite.IO.TinyWKB/) | [![MyGet](https://img.shields.io/myget/nettopologysuite/vpre/NetTopologySuite.IO.TinyWKB.svg?style=flat)](https://myget.org/feed/nettopologysuite/package/nuget/NetTopologySuite.IO.TinyWKB) |
+| License | GitHub Actions | NuGet |
+| ------- | ------ | ----- |
+| [![License](https://img.shields.io/github/license/NetTopologySuite/NetTopologySuite.IO.TinyWKB.svg)](https://github.com/NetTopologySuite/NetTopologySuite.IO.TinyWKB/blob/master/LICENSE.md) | [![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2FNetTopologySuite%2FNetTopologySuite.IO.TinyWKB%2Fbadge&style=flat)](https://actions-badge.atrox.dev/NetTopologySuite/NetTopologySuite.IO.TinyWKB/goto) | [![NuGet](https://img.shields.io/nuget/v/NetTopologySuite.IO.TinyWKB.svg)](https://www.nuget.org/packages/NetTopologySuite.IO.TinyWKB/) |
 
 ## Usage
 
