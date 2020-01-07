@@ -30,6 +30,14 @@
     <NtsBuildMetadata Condition=" '$(NtsBuildMetadata)' == '' ">ci.appveyor.$(APPVEYOR_BUILD_NUMBER)</NtsBuildMetadata>
   </PropertyGroup>
 
+  <!-- Github Actions -->
+  <PropertyGroup Condition=" '$(GITHUB_ACTIONS)' == 'true' ">
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <NtsBuildMetadata Condition=" '$(NtsBuildMetadata)' == '' ">ci.github.$(GITHUB_ACTION)</NtsBuildMetadata>
+    <NtsOfficialRelease Condition=" '$(GITHUB_REF)' == 'refs/heads/master' ">true</NtsOfficialRelease>
+  </PropertyGroup>
+
   <!-- Fallback for local builds and CI environments we don't recognize -->
   <PropertyGroup>
     <NtsBuildMetadata Condition=" '$(NtsBuildMetadata)' == '' ">local</NtsBuildMetadata>
@@ -39,7 +47,7 @@
     <!-- MAJOR, MINOR, and PATCH are defined according to SemVer 2.0.0. -->
     <NtsMajorVersion>2</NtsMajorVersion>
     <NtsMinorVersion>0</NtsMinorVersion>
-    <NtsPatchVersion>1</NtsPatchVersion>
+    <NtsPatchVersion>0</NtsPatchVersion>
 
     <NtsBuildTimestamp>$([System.DateTime]::UtcNow.Ticks)</NtsBuildTimestamp>
     <NtsDaysSinceEpoch>$([System.DateTime]::op_Subtraction($([System.DateTime]::new($(NtsBuildTimestamp)).Date),$([System.DateTime]::new(621355968000000000))).TotalDays.ToString("00000"))</NtsDaysSinceEpoch>
