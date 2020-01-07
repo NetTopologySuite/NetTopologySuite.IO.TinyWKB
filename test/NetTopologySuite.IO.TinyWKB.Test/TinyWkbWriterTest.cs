@@ -216,6 +216,24 @@ namespace NetTopologySuite.IO.Test
             TestReRead(gc, twkbData);
         }
 
+        [Test]
+        public void TestEmpty()
+        {
+            DoTestEmpty(GeometryFactory.Default.CreatePoint((Coordinate) null));
+            DoTestEmpty(GeometryFactory.Default.CreateLineString((Coordinate[])null));
+            DoTestEmpty(GeometryFactory.Default.CreatePolygon((Coordinate[])null));
+            DoTestEmpty(GeometryFactory.Default.CreateMultiPoint((CoordinateSequence)null));
+            DoTestEmpty(GeometryFactory.Default.CreateMultiLineString((LineString[])null));
+            DoTestEmpty(GeometryFactory.Default.CreateMultiPolygon((Polygon[])null));
+            DoTestEmpty(GeometryFactory.Default.CreateGeometryCollection(null));
+        }
+
+        private void DoTestEmpty(Geometry g)
+        {
+            byte[] twkbData = TestWrite(g);
+            TestReRead(g, twkbData);
+        }
+
         private void AddIds(GeometryCollection gc)
         {
             if (!_emitIdList) return;

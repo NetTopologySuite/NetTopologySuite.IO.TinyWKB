@@ -75,6 +75,10 @@ namespace NetTopologySuite.IO
             // Read the common, extended header information
             var header = TinyWkbHeader.Read(reader);
 
+            // If is empty bail out
+            if (header.HasEmptyGeometry)
+                return CreateEmpty(header);
+
             // Since we don't do anything with size just drop it
             if (header.HasSize) ReadUVarint(reader);
 
@@ -108,6 +112,28 @@ namespace NetTopologySuite.IO
             }
 
             throw new NotSupportedException();
+        }
+
+        private Geometry CreateEmpty(TinyWkbHeader header)
+        {
+            switch (header.GeometryType)
+            {
+                case TinyWkbGeometryType.Point:
+                    return _factory.CreatePoint((CoordinateSequence) null);
+                case TinyWkbGeometryType.LineString:
+                    return _factory.CreateLineString((CoordinateSequence)null);
+                case TinyWkbGeometryType.Polygon:
+                    return _factory.CreatePolygon((CoordinateSequence)null);
+                case TinyWkbGeometryType.MultiPoint:
+                    return _factory.CreateMultiPoint((CoordinateSequence)null);
+                case TinyWkbGeometryType.MultiLineString:
+                    return _factory.CreateMultiLineString(null);
+                case TinyWkbGeometryType.MultiPolygon:
+                    return _factory.CreateMultiPolygon(null);
+                case TinyWkbGeometryType.GeometryCollection:
+                    return _factory.CreateGeometryCollection(null);
+            }
+            throw new ArgumentException("Invalid geometry type specified in header", nameof(header));
         }
 
         private Point ReadPoint(BinaryReader reader, CoordinateSequenceReader csReader)
