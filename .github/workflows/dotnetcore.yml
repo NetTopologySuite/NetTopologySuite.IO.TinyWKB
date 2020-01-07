@@ -20,4 +20,4 @@ jobs:
     - name: Pack with dotnet
       run: dotnet pack --configuration Release
     - name: Push with dotnet
-      run: dotnet nuget push {{secrets.GITHUB_TOKEN}} **/NetTopologySuite.IO.TinyWKB.*.nuget --source https://nuget.pkg.github.com/nettopologysuite/index.json
+      run: dotnet nuget push --force-english-output -k ${{secrets.GITHUB_TOKEN}} **/NetTopologySuite.IO.TinyWKB.*.nuget -s https://nuget.pkg.github.com/nettopologysuite/index.json
