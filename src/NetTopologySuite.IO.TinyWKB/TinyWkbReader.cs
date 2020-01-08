@@ -75,12 +75,12 @@ namespace NetTopologySuite.IO
             // Read the common, extended header information
             var header = TinyWkbHeader.Read(reader);
 
+            // Since we don't do anything with size just drop it
+            if (header.HasSize) ReadUVarint(reader);
+
             // If is empty bail out
             if (header.HasEmptyGeometry)
                 return CreateEmpty(header);
-
-            // Since we don't do anything with size just drop it
-            if (header.HasSize) ReadUVarint(reader);
 
             // If we did sth. with size this would be correct.
             /*ulong size = header.HasSize ? ReadUVarint(reader) : 0;*/

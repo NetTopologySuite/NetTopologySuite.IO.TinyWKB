@@ -115,9 +115,6 @@ namespace NetTopologySuite.IO
             var header = ToHeader(geometry);
             TinyWkbHeader.Write(writer, header);
 
-            // If geometry is empty, no more information needs to be written.
-            if (geometry.IsEmpty) return;
-
             // If we need to emit size, write geometry information to memory stream
             if (header.HasSize)
             {
@@ -140,6 +137,10 @@ namespace NetTopologySuite.IO
 
         private void WriteGeometry(BinaryWriter writer, TinyWkbHeader header, Geometry geometry)
         {
+            // If geometry is empty, no more information needs to be written.
+            if (geometry.IsEmpty) return;
+
+            // if we have a geometry collection
             if (geometry.OgcGeometryType == OgcGeometryType.GeometryCollection)
             {
                 WriteGeometryCollection(writer, header, (GeometryCollection)geometry);

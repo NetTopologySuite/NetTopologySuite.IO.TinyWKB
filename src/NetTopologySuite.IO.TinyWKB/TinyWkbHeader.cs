@@ -86,9 +86,9 @@ namespace NetTopologySuite.IO
             if (precisionXY < -7 || 7 < precisionXY)
                 throw new ArgumentOutOfRangeException(nameof(precisionXY));
 
-            if (precisionZ < 0 || 7 < precisionXY)
+            if (precisionZ < 0 || 7 < precisionZ)
                 throw new ArgumentOutOfRangeException(nameof(precisionZ));
-            if (precisionM < 0 || 7 < precisionXY)
+            if (precisionM < 0 || 7 < precisionM)
                 throw new ArgumentOutOfRangeException(nameof(precisionM));
 
             // encode xy precision.

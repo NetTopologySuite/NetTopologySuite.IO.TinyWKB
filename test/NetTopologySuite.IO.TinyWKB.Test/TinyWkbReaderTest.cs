@@ -38,7 +38,7 @@ namespace NetTopologySuite.IO.Test
                     ms.Seek(0, SeekOrigin.Begin);
                     Assert.That(() => g = _reader.Read(br), Throws.Nothing);
                     Assert.That(g.OgcGeometryType, Is.EqualTo(type));
-
+                    Assert.That(ms.Position, Is.EqualTo(ms.Length));
                 }
             }
 
@@ -51,6 +51,28 @@ namespace NetTopologySuite.IO.Test
             byte[] data2 = wrtr.Write(g);
             TestContext.WriteLine($"Write '{g.AsText()}' to '{TinyWkbWriterTest.ToHexString(data2)}'.");
             TestContext.WriteLine(_reader.Read(data2));
+        }
+
+        [TestCase("POINT EMPTY", "0110")]
+        [TestCase("LINESTRING EMPTY", "821200")]
+        [TestCase("POLYGON EMPTY", "0310")]
+        [TestCase("MULTIPOINT EMPTY", "0410")]
+        [TestCase("MULTILINESTRING EMPTY", "0510")]
+        [TestCase("MULTIPOLYGON EMPTY", "0610")]
+        [TestCase("GEOMETRYCOLLECTION EMPTY", "0710")]
+        public void TestsFromPostgis(string wkt, string hexString)
+        {
+            Geometry g = null;
+            using (var ms = new MemoryStream(WKBReader.HexToBytes(hexString)))
+            {
+                ms.Seek(0, SeekOrigin.Begin);
+                using (var br = new BinaryReader(ms, Encoding.UTF8, false))
+                {
+                    Assert.That(() => g = _reader.Read(br), Throws.Nothing);
+                    Assert.That(g.ToText(), Is.EqualTo(wkt));
+                    Assert.That(ms.Position, Is.EqualTo(ms.Length));
+                }
+            }
         }
     }
 }
