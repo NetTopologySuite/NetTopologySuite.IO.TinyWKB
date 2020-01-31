@@ -32,11 +32,12 @@ var geometryWriter = new TinyWkbWriter(
     emitZ: false       // Emit z-ordinate values if geometry has them
     precisionZ: 3      // number of decimal digits for z-ordinates
     emitM: false,      // Emit m-ordinate values if geometry has them
-    precisionM: 3,     // number of decimal digits for z-ordinates
+    precisionM: 3,     // number of decimal digits for m-ordinates
     emitSize: false    // Emit the size of the geometry definition 
     emitBoundingBox: true, 
                        // Emit the bounding box of the geometry for all dimensions 
-    emitIdList: false  // Emit the size of the geometry definition 
+    emitIdList: false  // Emit a list of identifiers, one for every geometry in a
+                       //   MULTI-geometry or GEOMETRYCOLLECTION
 );
 
 /*
