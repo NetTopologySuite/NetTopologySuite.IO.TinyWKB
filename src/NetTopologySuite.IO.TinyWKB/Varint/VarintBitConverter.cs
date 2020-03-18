@@ -142,7 +142,7 @@ namespace System
         /// </summary>
         /// <param name="bytes">Varint encoded array of bytes.</param>
         /// <returns>64-bit signed value</returns>
-        public static long ToInt64(byte[] bytes)
+        public static long ToInt64(ReadOnlySpan<byte> bytes)
         {
             var zigzag = ToTarget(bytes, 64);
             return DecodeZigZag(zigzag);
@@ -153,7 +153,7 @@ namespace System
         /// </summary>
         /// <param name="bytes">Varint encoded array of bytes.</param>
         /// <returns>64-bit unsigned value</returns>
-        public static ulong ToUInt64(byte[] bytes)
+        public static ulong ToUInt64(ReadOnlySpan<byte> bytes)
         {
             return ToTarget(bytes, 64);
         }
@@ -173,7 +173,7 @@ namespace System
             return (long)(value >> 1);
         }
 
-        private static ulong ToTarget(byte[] bytes, int sizeBites)
+        private static ulong ToTarget(ReadOnlySpan<byte> bytes, int sizeBites)
         {
             int shift = 0;
             ulong result = 0;

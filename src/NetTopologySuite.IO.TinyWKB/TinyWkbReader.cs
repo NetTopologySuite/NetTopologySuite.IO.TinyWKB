@@ -1,9 +1,7 @@
 
 using System;
-using System.Buffers;
 using System.IO;
 using System.Runtime.CompilerServices;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using NetTopologySuite.DataStructures;
 using NetTopologySuite.Geometries;
@@ -275,32 +273,26 @@ namespace NetTopologySuite.IO
 
         private static long ReadVarint(BinaryReader reader)
         {
-            byte[] data = ReadVarintData(reader);
-            return VarintBitConverter.ToInt64(data);
+            Span<byte> buffer = stackalloc byte[10];
+            return VarintBitConverter.ToInt64(ReadVarintData(reader, buffer));
         }
         private static ulong ReadUVarint(BinaryReader reader)
         {
-            byte[] data = ReadVarintData(reader);
-            return VarintBitConverter.ToUInt64(data);
+            Span<byte> buffer = stackalloc byte[10];
+            return VarintBitConverter.ToUInt64(ReadVarintData(reader, buffer));
         }
 
-        private static byte[] ReadVarintData(BinaryReader reader)
+        private static ReadOnlySpan<byte> ReadVarintData(BinaryReader reader, Span<byte> buffer)
         {
-            byte[] buffer = ArrayPool<byte>.Shared.Rent(10);
-            int i = 0;
-            while (i < 10)
+            for (int i = 0; i < buffer.Length; i++)
             {
-                if (((buffer[i++] = reader.ReadByte()) & 0x80) == 0)
-                    break;
+                if (((buffer[i] = reader.ReadByte()) & 0x80) == 0)
+                {
+                    return buffer.Slice(0, i + 1);
+                }
             }
 
-            if (i >= 10)
-                throw new InvalidDataException();
-
-            byte[] res = new ReadOnlySpan<byte>(buffer, 0, i).ToArray();
-            ArrayPool<byte>.Shared.Return(buffer);
-
-            return res;
+            throw new InvalidDataException();
         }
     }
 }
