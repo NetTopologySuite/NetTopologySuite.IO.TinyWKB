@@ -136,57 +136,6 @@ namespace System
 
             } while (value != 0);
         }
-        /// <summary>
-        /// Returns byte value from varint encoded array of bytes.
-        /// </summary>
-        /// <param name="bytes">Varint encoded array of bytes.</param>
-        /// <returns>Byte value</returns>
-        public static byte ToByte(byte[] bytes)
-        {
-            return (byte)ToTarget(bytes, 8);
-        }
-
-        /// <summary>
-        /// Returns 16-bit signed value from varint encoded array of bytes.
-        /// </summary>
-        /// <param name="bytes">Varint encoded array of bytes.</param>
-        /// <returns>16-bit signed value</returns>
-        public static short ToInt16(byte[] bytes)
-        {
-            var zigzag = ToTarget(bytes, 16);
-            return (short)DecodeZigZag(zigzag);
-        }
-
-        /// <summary>
-        /// Returns 16-bit usigned value from varint encoded array of bytes.
-        /// </summary>
-        /// <param name="bytes">Varint encoded array of bytes.</param>
-        /// <returns>16-bit usigned value</returns>
-        public static ushort ToUInt16(byte[] bytes)
-        {
-            return (ushort)ToTarget(bytes, 16);
-        }
-
-        /// <summary>
-        /// Returns 32-bit signed value from varint encoded array of bytes.
-        /// </summary>
-        /// <param name="bytes">Varint encoded array of bytes.</param>
-        /// <returns>32-bit signed value</returns>
-        public static int ToInt32(byte[] bytes)
-        {
-            var zigzag = ToTarget(bytes, 32);
-            return (int)DecodeZigZag(zigzag);
-        }
-
-        /// <summary>
-        /// Returns 32-bit unsigned value from varint encoded array of bytes.
-        /// </summary>
-        /// <param name="bytes">Varint encoded array of bytes.</param>
-        /// <returns>32-bit unsigned value</returns>
-        public static uint ToUInt32(byte[] bytes)
-        {
-            return (uint)ToTarget(bytes, 32);
-        }
 
         /// <summary>
         /// Returns 64-bit signed value from varint encoded array of bytes.
