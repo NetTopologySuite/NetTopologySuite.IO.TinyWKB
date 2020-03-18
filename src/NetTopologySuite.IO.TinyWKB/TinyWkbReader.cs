@@ -273,12 +273,12 @@ namespace NetTopologySuite.IO
 
         private static long ReadVarint(BinaryReader reader)
         {
-            Span<byte> buffer = stackalloc byte[10];
+            Span<byte> buffer = stackalloc byte[9];
             return VarintBitConverter.ToInt64(ReadVarintData(reader, buffer));
         }
         private static ulong ReadUVarint(BinaryReader reader)
         {
-            Span<byte> buffer = stackalloc byte[10];
+            Span<byte> buffer = stackalloc byte[9];
             return VarintBitConverter.ToUInt64(ReadVarintData(reader, buffer));
         }
 
