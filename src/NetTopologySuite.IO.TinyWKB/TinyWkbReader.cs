@@ -90,15 +90,14 @@ namespace NetTopologySuite.IO
 
             // Based on header information, build a coordinate sequence reader
             var coordinateReader = new CoordinateSequenceReader(_factory.CoordinateSequenceFactory, header);
-            double[] last = null;
             switch (header.GeometryType)
             {
                 case TinyWkbGeometryType.Point:
                     return ReadPoint(reader, coordinateReader);
                 case TinyWkbGeometryType.LineString:
-                    return ReadLineString(reader, coordinateReader, ref last);
+                    return ReadLineString(reader, coordinateReader);
                 case TinyWkbGeometryType.Polygon:
-                    return ReadPolygon(reader, coordinateReader, ref last);
+                    return ReadPolygon(reader, coordinateReader);
                 case TinyWkbGeometryType.MultiPoint:
                     return ReadMultiPoint(reader, header, coordinateReader);
                 case TinyWkbGeometryType.MultiLineString:
@@ -136,24 +135,23 @@ namespace NetTopologySuite.IO
 
         private Point ReadPoint(BinaryReader reader, CoordinateSequenceReader csReader)
         {
-            double[] last = null;
-            var sequence = csReader.Read(reader, 1, ref last);
+            var sequence = csReader.Read(reader, 1);
             return _factory.CreatePoint(sequence);
         }
-        private LineString ReadLineString(BinaryReader reader, CoordinateSequenceReader csReader, ref double[] last, int buffer = 0)
+        private LineString ReadLineString(BinaryReader reader, CoordinateSequenceReader csReader)
         {
             int numPoints = (int) ReadUVarint(reader);
-            var sequence = csReader.Read(reader, numPoints, ref last, buffer);
+            var sequence = csReader.Read(reader, numPoints);
             return _factory.CreateLineString(sequence);
         }
 
-        private Polygon ReadPolygon(BinaryReader reader, CoordinateSequenceReader csReader, ref double[] last)
+        private Polygon ReadPolygon(BinaryReader reader, CoordinateSequenceReader csReader)
         {
             int numRings = (int)ReadUVarint(reader);
             if (numRings == 0) return _factory.CreatePolygon(null, null);
 
             int numPoints = (int)ReadUVarint(reader);
-            var sequence = csReader.Read(reader, numPoints, ref last, 1);
+            var sequence = csReader.Read(reader, numPoints, closeRing: true);
             CoordinateSequences.CopyCoord(sequence, 0, sequence, numPoints);
             var shell = _factory.CreateLinearRing(sequence);
             var holes = new LinearRing[numRings - 1];
@@ -162,7 +160,7 @@ namespace NetTopologySuite.IO
                 for (int i = 0; i < holes.Length; i++)
                 {
                     numPoints = (int)ReadUVarint(reader);
-                    sequence = csReader.Read(reader, numPoints, ref last, 1);
+                    sequence = csReader.Read(reader, numPoints, closeRing: true);
                     CoordinateSequences.CopyCoord(sequence, 0, sequence, numPoints);
                     holes[i] = _factory.CreateLinearRing(sequence);
                 }
@@ -175,8 +173,7 @@ namespace NetTopologySuite.IO
         {
             int numPoints = (int) ReadUVarint(reader);
             long[] idList = ReadIdList(reader, header, numPoints);
-            double[] last = null;
-            var sequence = csReader.Read(reader, numPoints, ref last);
+            var sequence = csReader.Read(reader, numPoints);
             var res = _factory.CreateMultiPoint(sequence);
             for (int i = 0; i < numPoints; i++)
                 res.GetGeometryN(i).UserData = idList[i];
@@ -188,10 +185,9 @@ namespace NetTopologySuite.IO
             int numLineStrings = (int)ReadUVarint(reader);
             long[] idList = ReadIdList(reader, header, numLineStrings);
             var lineStrings = new LineString[numLineStrings];
-            double[] last = null;
             for (int i = 0; i < numLineStrings; i++)
             {
-                lineStrings[i] = ReadLineString(reader, csReader, ref last);
+                lineStrings[i] = ReadLineString(reader, csReader);
                 lineStrings[i].UserData = idList[i];
             }
 
@@ -203,10 +199,9 @@ namespace NetTopologySuite.IO
             long[] idList = ReadIdList(reader, header, numPolygons);
             var polygons = new Polygon[numPolygons];
 
-            double[] last = null;
             for (int i = 0; i < numPolygons; i++)
             {
-                polygons[i] = ReadPolygon(reader, csReader, ref last);
+                polygons[i] = ReadPolygon(reader, csReader);
                 polygons[i].UserData = idList[i];
             }
 

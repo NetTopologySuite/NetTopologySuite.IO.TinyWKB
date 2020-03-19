@@ -1,5 +1,4 @@
 
-using System;
 using System.IO;
 using System.Runtime.CompilerServices;
 using NetTopologySuite.Geometries;
@@ -12,144 +11,67 @@ namespace NetTopologySuite.IO
     {
         private class CoordinateSequenceReader
         {
-            private delegate double[] CoordinateReaderFn(BinaryReader reader, double descale12, double descale3, double descale4, double[] last);
-            private delegate void CoordinateAddFn(CoordinateSequence sequence, int index, double[] coords);
-
             private readonly CoordinateSequenceFactory _coordinateSequenceFactory;
-            private readonly CoordinateReaderFn _coordinateReaderFn;
-            private readonly CoordinateAddFn _coordinateAddFn;
-            private readonly double _descale12, _descale3, _descale4;
+            private readonly double[] _descales;
+            private readonly long[] _prevCoordinate;
             private readonly int _dimension, _measures;
 
             public CoordinateSequenceReader(CoordinateSequenceFactory coordinateSequenceFactory, TinyWkbHeader header)
             {
                 _coordinateSequenceFactory = coordinateSequenceFactory;
-                _descale12 = header.DescaleX();
                 if (!header.HasExtendedPrecisionInformation || !(header.HasZ | header.HasM))
                 {
-                    _coordinateReaderFn = ReadCoordinate2;
+                    _descales = new[] { header.DescaleX(), header.DescaleY() };
                     _dimension = 2;
-                    _coordinateAddFn = AddXY;
                 }
                 else if (header.HasZ && !header.HasM)
                 {
-                    _descale3 = header.DescaleZ();
-                    _coordinateReaderFn = ReadCoordinate3;
+                    _descales = new[] { header.DescaleX(), header.DescaleY(), header.DescaleZ() };
                     _dimension = 3;
-                    _coordinateAddFn = AddXYZ;
                 }
                 else if (!header.HasZ && header.HasM)
                 {
-                    _descale3 = header.DescaleM();
-                    _coordinateReaderFn = ReadCoordinate3;
+                    _descales = new[] { header.DescaleX(), header.DescaleY(), header.DescaleM() };
                     _dimension = 3;
                     _measures = 1;
-                    _coordinateAddFn = AddXYM;
                 }
                 else
                 {
-                    _descale3 = header.DescaleZ();
-                    _descale4 = header.DescaleM();
-                    _coordinateReaderFn = ReadCoordinate4;
+                    _descales = new[] { header.DescaleX(), header.DescaleY(), header.DescaleZ(), header.DescaleM() };
                     _dimension = 4;
                     _measures = 1;
-                    _coordinateAddFn = AddXYZM;
                 }
 
+                _prevCoordinate = new long[_dimension];
             }
 
 
-            public CoordinateSequence Read(BinaryReader reader, int count, ref double[] last, int buffer = 0)
+            public CoordinateSequence Read(BinaryReader reader, int count, bool closeRing = false)
             {
-                var res = _coordinateSequenceFactory.Create(count + buffer, _dimension, _measures);
+                var res = _coordinateSequenceFactory.Create(count + (closeRing ? 1 : 0), _dimension, _measures);
+
+                // copy these array references to local variables to help the JIT optimize this loop
+                long[] prevCoordinate = _prevCoordinate;
+                double[] descales = _descales;
+
                 for (int i = 0; i < count; i++)
                 {
-                    last = _coordinateReaderFn(reader, _descale12, _descale3, _descale4, last);
-                    _coordinateAddFn(res, i, last);
+                    for (int dim = 0; dim < prevCoordinate.Length; dim++)
+                    {
+                        prevCoordinate[dim] += ReadVarint(reader);
+                        res.SetOrdinate(i, dim, ToDouble(prevCoordinate[dim], descales[dim]));
+                    }
                 }
 
-                return res;
-            }
-
-
-            private static double[] ReadCoordinate2(BinaryReader reader,
-                double descale12, double descale3, double descale4,
-                double[] lastRead)
-            {
-                double[] res = {
-                    ToDouble(ReadVarint(reader), descale12),
-                    ToDouble(ReadVarint(reader), descale12) };
-
-                if (lastRead != null)
+                if (closeRing)
                 {
-                    res[0] += lastRead[0];
-                    res[1] += lastRead[1];
+                    for (int dim = 0; dim < res.Dimension; dim++)
+                    {
+                        res.SetOrdinate(count, dim, res.GetOrdinate(0, dim));
+                    }
                 }
 
                 return res;
-            }
-            private static double[] ReadCoordinate3(BinaryReader reader,
-                double descale12, double descale3, double descale4,
-                double[] lastRead)
-            {
-                double[] res = {
-                    ToDouble(ReadVarint(reader), descale12),
-                    ToDouble(ReadVarint(reader), descale12),
-                    ToDouble(ReadVarint(reader), descale3) };
-
-                if (lastRead != null)
-                {
-                    res[0] += lastRead[0];
-                    res[1] += lastRead[1];
-                    res[2] += lastRead[2];
-                }
-
-                return res;
-            }
-            private static double[] ReadCoordinate4(BinaryReader reader,
-                double descale12, double descale3, double descale4,
-                double[] lastRead)
-            {
-                double[] res = {
-                    ToDouble(ReadVarint(reader), descale12),
-                    ToDouble(ReadVarint(reader), descale12),
-                    ToDouble(ReadVarint(reader), descale3),
-                    ToDouble(ReadVarint(reader), descale4) };
-
-                if (lastRead != null)
-                {
-                    res[0] += lastRead[0];
-                    res[1] += lastRead[1];
-                    res[2] += lastRead[2];
-                    res[3] += lastRead[3];
-                }
-
-                return res;
-            }
-
-            private static void AddXY(CoordinateSequence sequence, int index, double[] ordinateValues)
-            {
-                sequence.SetX(index, ordinateValues[0]);
-                sequence.SetY(index, ordinateValues[1]);
-            }
-            private static void AddXYZ(CoordinateSequence sequence, int index, double[] ordinateValues)
-            {
-                sequence.SetX(index, ordinateValues[0]);
-                sequence.SetY(index, ordinateValues[1]);
-                if (sequence.HasZ) sequence.SetZ(index, ordinateValues[2]);
-            }
-            private static void AddXYM(CoordinateSequence sequence, int index, double[] ordinateValues)
-            {
-                sequence.SetX(index, ordinateValues[0]);
-                sequence.SetY(index, ordinateValues[1]);
-                if (sequence.HasM) sequence.SetM(index, ordinateValues[2]);
-            }
-            private static void AddXYZM(CoordinateSequence sequence, int index, double[] ordinateValues)
-            {
-                sequence.SetX(index, ordinateValues[0]);
-                sequence.SetY(index, ordinateValues[1]);
-                if (sequence.HasZ) sequence.SetZ(index, ordinateValues[2]);
-                if (sequence.HasM) sequence.SetM(index, ordinateValues[3]);
             }
         }
     }
