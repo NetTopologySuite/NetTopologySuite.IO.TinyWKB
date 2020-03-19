@@ -152,7 +152,6 @@ namespace NetTopologySuite.IO
 
             int numPoints = (int)ReadUVarint(reader);
             var sequence = csReader.Read(reader, numPoints, closeRing: true);
-            CoordinateSequences.CopyCoord(sequence, 0, sequence, numPoints);
             var shell = _factory.CreateLinearRing(sequence);
             var holes = new LinearRing[numRings - 1];
             if (numRings > 1)
@@ -161,7 +160,6 @@ namespace NetTopologySuite.IO
                 {
                     numPoints = (int)ReadUVarint(reader);
                     sequence = csReader.Read(reader, numPoints, closeRing: true);
-                    CoordinateSequences.CopyCoord(sequence, 0, sequence, numPoints);
                     holes[i] = _factory.CreateLinearRing(sequence);
                 }
             }
