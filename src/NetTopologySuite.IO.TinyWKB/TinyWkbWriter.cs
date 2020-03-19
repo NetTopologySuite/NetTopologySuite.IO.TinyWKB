@@ -124,7 +124,7 @@ namespace NetTopologySuite.IO
                     {
                         WriteGeometry(geomWriter, header, geometry);
                     }
-                    writer.Write(VarintBitConverter.GetVarintBytes(ms.Length));
+                    writer.Write(VarintBitConverter.GetVarintBytes((ulong)ms.Length));
                     writer.Write(ms.GetBuffer(), 0, (int)ms.Position);
                 }
             } 
