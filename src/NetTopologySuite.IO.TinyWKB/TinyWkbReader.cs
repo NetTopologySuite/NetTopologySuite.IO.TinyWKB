@@ -174,8 +174,6 @@ namespace NetTopologySuite.IO
                     for (int i = 0; i < gc.NumGeometries; i++)
                         gc.GetGeometryN(i).UserData = idList[i];
                 }
-
-                exportIdList = false;
             }
 
             // invalidate idList if we don't want to export it.
@@ -190,7 +188,7 @@ namespace NetTopologySuite.IO
             switch (header.GeometryType)
             {
                 case TinyWkbGeometryType.Point:
-                    return _factory.CreatePoint((CoordinateSequence) null);
+                    return _factory.CreatePoint((CoordinateSequence)null);
                 case TinyWkbGeometryType.LineString:
                     return _factory.CreateLineString((CoordinateSequence)null);
                 case TinyWkbGeometryType.Polygon:
@@ -241,6 +239,9 @@ namespace NetTopologySuite.IO
             return _factory.CreatePolygon(shell, holes);
         }
 
+        /// <summary>
+        /// Event raised when a list of ids was provided.
+        /// </summary>
         public event EventHandler<IdentifiersEventArgs> IdentifiersProvided;
 
         private MultiPoint ReadMultiPoint(BinaryReader reader, TinyWkbHeader header, CoordinateSequenceReader csReader, out long[] idList)

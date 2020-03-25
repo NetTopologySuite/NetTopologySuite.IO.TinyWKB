@@ -1,7 +1,4 @@
 using System;
-using System.Runtime.CompilerServices;
-
-//[assembly:InternalsVisibleTo("NetTopologySuite.IO.TinyWKB.Test")]
 
 namespace NetTopologySuite.IO
 {

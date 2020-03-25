@@ -7,102 +7,118 @@ namespace NetTopologySuite.IO
 {
     public partial class TinyWkbWriter
     {
-        private class CoordinateSequenceWriter {
-
-            private delegate void WriteVarintsFn(BinaryWriter writer, CoordinateSequence sequence, int index, Span<double> last);
-            private readonly int _dimension;
-            private readonly int _measures;
-
-            private readonly WriteVarintsFn _writeVarintsFn;
+        private class CoordinateSequenceWriter
+        {
+            private readonly long[] _prevCoordinate;
 
             public CoordinateSequenceWriter(TinyWkbHeader header)
             {
-                int dimension = 2;
-                int measures = 0;
-                Span<double> scales = stackalloc double[4];
-                scales[0] = scales[1] = header.ScaleX();
-                if (header.HasExtendedPrecisionInformation)
+                if (!header.HasExtendedPrecisionInformation || !(header.HasZ | header.HasM))
                 {
-                    if (header.HasZ)
-                    {
-                        scales[dimension++] = header.ScaleZ();
-                    }
-                    if (header.HasM)
-                    {
-                        scales[dimension++] = header.ScaleM();
-                        measures = 1;
-                        if (dimension == 3)
-                            _writeVarintsFn = WriteVarints2DM;
-                        else
-                            _writeVarintsFn = WriteVarints3DM;
-                    }
-                    else
-                        _writeVarintsFn = WriteVarints3D;
-
+                    Scales = new[] { header.ScaleX(), header.ScaleY() };
+                    Dimension = 2;
+                }
+                else if (header.HasZ && !header.HasM)
+                {
+                    Scales = new[] { header.ScaleX(), header.ScaleY(), header.ScaleZ() };
+                    Dimension = 3;
+                }
+                else if (!header.HasZ && header.HasM)
+                {
+                    Scales = new[] { header.ScaleX(), header.ScaleY(), header.ScaleM() };
+                    Dimension = 3;
+                    Measures = 1;
                 }
                 else
-                    _writeVarintsFn = WriteVarints2D;
+                {
+                    Scales = new[] { header.ScaleX(), header.ScaleY(), header.ScaleZ(), header.ScaleM() };
+                    Dimension = 4;
+                    Measures = 1;
+                }
 
-                _dimension = dimension;
-                _measures = measures;
-                Scales = scales.Slice(0, dimension).ToArray();
+                _prevCoordinate = new long[Dimension];
             }
 
             /// <summary>
-            /// Gets an array to pass to <see cref="Write"/> function as parameter <c>last</c>.
+            /// Gets the number of dimensions to write
             /// </summary>
-            public int Dimension => _dimension;
+            public int Dimension { get; }
 
-            public int Measures => _measures;
+            /// <summary>
+            /// Gets the number of measure values to write
+            /// </summary>
+            public int Measures { get; }
 
+            /// <summary>
+            /// Gets a vector containing the scale factors for each ordinate
+            /// </summary>
             public double[] Scales { get; }
 
-            public void Write(BinaryWriter writer, CoordinateSequence sequence, Span<double> last, int omit)
+            public void Write(BinaryWriter writer, CoordinateSequence sequence, int omit, int coordinatesRequired)
             {
                 if (sequence == null || sequence.Count == 0)
                     return;
 
                 int count = sequence.Count - omit;
-                if (count > 1)
-                    writer.Write(VarintBitConverter.GetVarintBytes((uint)count));
-                for(int i = 0; i < count; i++)
-                    _writeVarintsFn(writer, sequence, i,  last);
+                long[] prevCoordinate = _prevCoordinate;
+                Span<long> encCoordinate = stackalloc long[Dimension];
+
+                // Get an array of longs to store ordinate data in
+                long[] ordinatesToWrite = ArrayPool<long>.Shared.Rent(count * Dimension);
+                int coordinatesToWrite = 0;
+                for (int i = 0; i < count; i++)
+                {
+                    // Assume we don't need to write the coordinate
+                    bool write = false;
+
+                    // Encode ordinate values
+                    for (int dim = 0; dim < Dimension; dim++)
+                    {
+                        encCoordinate[dim] = EncodeOrdinate(sequence.GetOrdinate(i, dim), Scales[dim], ref prevCoordinate[dim]);
+                        write |= encCoordinate[dim] != 0;
+                    }
+
+                    // This coordinate is different from the last.
+                    if (write)
+                    {
+                        for (int dim = 0; dim < Dimension; dim++)
+                            ordinatesToWrite[coordinatesToWrite * Dimension + dim] = encCoordinate[dim];
+                        coordinatesToWrite++;
+                    }
+                }
+
+                // Write 0's for required coordinates
+                if (coordinatesToWrite < coordinatesRequired)
+                    coordinatesToWrite = coordinatesRequired;
+
+                // If we have more than one coordinate to write, report that!
+                if (coordinatesToWrite > 1)
+                    writer.Write(VarintBitConverter.GetVarintBytes((uint)coordinatesToWrite));
+
+                // Write ordinate values
+                coordinatesToWrite *= Dimension;
+                for(int i = 0; i < coordinatesToWrite; i++)
+                    writer.Write(VarintBitConverter.GetVarintBytes(ordinatesToWrite[i]));
+
+                // return ordinate longs array
+                ArrayPool<long>.Shared.Return(ordinatesToWrite);
             }
 
-            private void WriteVarints2D(BinaryWriter writer, CoordinateSequence sequence, int index, Span<double> last)
+            public static long EncodeOrdinate(double value, double scale, ref long lastScaledValue)
             {
-                WriteOrdinate(writer, sequence.GetX(index), Scales[0], ref last[0]);
-                WriteOrdinate(writer, sequence.GetY(index), Scales[1], ref last[1]);
+                long lngValue = (long)Math.Round(value * scale, 0, MidpointRounding.AwayFromZero);
+                long valueEnc = lngValue - lastScaledValue;
+                lastScaledValue = lngValue;
+                return valueEnc;
             }
 
-            private void WriteVarints2DM(BinaryWriter writer, CoordinateSequence sequence, int index, Span<double> last)
+            /// <summary>
+            /// Method to initialize the previous coordinate
+            /// </summary>
+            public void InitPrevCoordinate()
             {
-                WriteOrdinate(writer, sequence.GetX(index), Scales[0], ref last[0]);
-                WriteOrdinate(writer, sequence.GetY(index), Scales[1], ref last[1]);
-                WriteOrdinate(writer, sequence.GetM(index), Scales[2], ref last[2]);
-            }
-
-            private void WriteVarints3D(BinaryWriter writer, CoordinateSequence sequence, int index, Span<double> last)
-            {
-                WriteOrdinate(writer, sequence.GetX(index), Scales[0], ref last[0]);
-                WriteOrdinate(writer, sequence.GetY(index), Scales[1], ref last[1]);
-                WriteOrdinate(writer, sequence.GetZ(index), Scales[2], ref last[2]);
-            }
-
-            private void WriteVarints3DM(BinaryWriter writer, CoordinateSequence sequence, int index, Span<double> last)
-            {
-                WriteOrdinate(writer, sequence.GetX(index), Scales[0], ref last[0]);
-                WriteOrdinate(writer, sequence.GetY(index), Scales[1], ref last[1]);
-                WriteOrdinate(writer, sequence.GetZ(index), Scales[2], ref last[2]);
-                WriteOrdinate(writer, sequence.GetM(index), Scales[3], ref last[3]);
-            }
-
-            public static void WriteOrdinate(BinaryWriter writer, double value, double scale, ref double lastScaledValue)
-            {
-                value = Math.Round(value * scale, 0, MidpointRounding.AwayFromZero);
-                double valueEnc = value - lastScaledValue;
-                lastScaledValue = value;
-                VarintBitConverter.WriteVarintBytesToBuffer(writer, (long)valueEnc);
+                for (int i = 0; i < Dimension; i++)
+                    _prevCoordinate[i] = 0;
             }
         }
     }

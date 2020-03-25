@@ -181,26 +181,25 @@ namespace NetTopologySuite.IO
             }
 
             var csWriter = new CoordinateSequenceWriter(header);
-            Span<double> initialLast = stackalloc double[csWriter.Dimension];
             switch (geometry.OgcGeometryType)
             {
                 case OgcGeometryType.Point:
-                    WritePoint(writer, csWriter, (Point)geometry, initialLast);
+                    WritePoint(writer, csWriter, (Point)geometry);
                     break;
                 case OgcGeometryType.LineString:
-                    WriteLineString(writer, csWriter, (LineString)geometry, initialLast);
+                    WriteLineString(writer, csWriter, (LineString)geometry);
                     break;
                 case OgcGeometryType.Polygon:
-                    WritePolygon(writer, csWriter, (Polygon)geometry, initialLast);
+                    WritePolygon(writer, csWriter, (Polygon)geometry);
                     break;
                 case OgcGeometryType.MultiPoint:
-                    WriteMultiPoint(writer, csWriter, (MultiPoint)geometry, initialLast, idList);
+                    WriteMultiPoint(writer, csWriter, (MultiPoint)geometry, idList);
                     break;
                 case OgcGeometryType.MultiLineString:
-                    WriteMultiLineString(writer, csWriter, (MultiLineString)geometry, initialLast, idList);
+                    WriteMultiLineString(writer, csWriter, (MultiLineString)geometry, idList);
                     break;
                 case OgcGeometryType.MultiPolygon:
-                    WriteMultiPolygon(writer, csWriter, (MultiPolygon)geometry, initialLast, idList);
+                    WriteMultiPolygon(writer, csWriter, (MultiPolygon)geometry, idList);
                     break;
                 default:
                     throw new ArgumentException(nameof(geometry));
@@ -209,55 +208,54 @@ namespace NetTopologySuite.IO
             //System.Buffers.ArrayPool<double>.Shared.Return(initialLast, true);
         }
 
-        private void WritePoint(BinaryWriter writer, CoordinateSequenceWriter csWriter, Point point, Span<double> last)
+        private void WritePoint(BinaryWriter writer, CoordinateSequenceWriter csWriter, Point point)
         {
             // We don't write bounding boxes for points. Period.
-            csWriter.Write(writer, point.CoordinateSequence, last, 0);
+            csWriter.Write(writer, point.CoordinateSequence, 0, 1);
         }
 
-        private void WriteLineString(BinaryWriter writer, CoordinateSequenceWriter csWriter, LineString lineString, Span<double> last)
+        private void WriteLineString(BinaryWriter writer, CoordinateSequenceWriter csWriter, LineString lineString)
         {
             WriteBoundingBox(writer, csWriter, lineString);
-            csWriter.Write(writer, lineString.CoordinateSequence, last, 0);
+            csWriter.Write(writer, lineString.CoordinateSequence, 0, 2);
         }
 
-        private void WritePolygon(BinaryWriter writer, CoordinateSequenceWriter csWriter, Polygon polygon, Span<double> last, bool omitBoundingBox = false)
+        private void WritePolygon(BinaryWriter writer, CoordinateSequenceWriter csWriter, Polygon polygon, bool omitBoundingBox = false)
         {
             if (!omitBoundingBox) WriteBoundingBox(writer, csWriter, polygon);
             writer.Write(VarintBitConverter.GetVarintBytes((uint)(1 + polygon.NumInteriorRings)));
-            csWriter.Write(writer, polygon.Shell.CoordinateSequence, last, 1);
+            csWriter.Write(writer, polygon.Shell.CoordinateSequence, 1, 3);
             for (int i = 0; i < polygon.NumInteriorRings; i++)
-                csWriter.Write(writer, polygon.GetInteriorRingN(i).CoordinateSequence, last, 1);
+                csWriter.Write(writer, polygon.GetInteriorRingN(i).CoordinateSequence, 1,3);
         }
 
-        private void WriteMultiPoint(BinaryWriter writer, CoordinateSequenceWriter csWriter, MultiPoint multiPoint,
-            Span<double> last, long[] idList)
+        private void WriteMultiPoint(BinaryWriter writer, CoordinateSequenceWriter csWriter, MultiPoint multiPoint, long[] idList)
         {
             WriteBoundingBox(writer, csWriter, multiPoint);
             writer.Write(VarintBitConverter.GetVarintBytes((uint)multiPoint.NumGeometries));
             WriteIdList(writer, multiPoint, idList);
             for (int i = 0; i < multiPoint.NumGeometries; i++)
-                csWriter.Write(writer, ((Point)multiPoint.GetGeometryN(i)).CoordinateSequence, last, 0);
+                csWriter.Write(writer, ((Point)multiPoint.GetGeometryN(i)).CoordinateSequence, 0, 1);
         }
 
         private void WriteMultiLineString(BinaryWriter writer, CoordinateSequenceWriter csWriter,
-            MultiLineString multiLineString, Span<double> last, long[] idList)
+            MultiLineString multiLineString, long[] idList)
         {
             WriteBoundingBox(writer, csWriter, multiLineString);
             writer.Write(VarintBitConverter.GetVarintBytes((uint)multiLineString.NumGeometries));
             WriteIdList(writer, multiLineString, idList);
             for (int i = 0; i < multiLineString.NumGeometries; i++)
-                csWriter.Write(writer, ((LineString)multiLineString.GetGeometryN(i)).CoordinateSequence, last, 0);
+                csWriter.Write(writer, ((LineString)multiLineString.GetGeometryN(i)).CoordinateSequence, 0, 2);
         }
 
         private void WriteMultiPolygon(BinaryWriter writer, CoordinateSequenceWriter csWriter,
-            MultiPolygon multiPolygon, Span<double> last, long[] idList)
+            MultiPolygon multiPolygon, long[] idList)
         {
             WriteBoundingBox(writer, csWriter, multiPolygon);
             writer.Write(VarintBitConverter.GetVarintBytes((uint)multiPolygon.NumGeometries));
             WriteIdList(writer, multiPolygon, idList);
             for (int i = 0; i < multiPolygon.NumGeometries; i++)
-                WritePolygon(writer, csWriter, (Polygon)multiPolygon.GetGeometryN(i), last, true);
+                WritePolygon(writer, csWriter, (Polygon)multiPolygon.GetGeometryN(i), true);
         }
 
         private void WriteGeometryCollection(BinaryWriter writer, TinyWkbHeader header, GeometryCollection gc,
@@ -268,7 +266,10 @@ namespace NetTopologySuite.IO
             writer.Write(VarintBitConverter.GetVarintBytes((uint)gc.NumGeometries));
             WriteIdList(writer, gc, idList);
             for (int i = 0; i < gc.NumGeometries; i++)
+            {
                 Write(writer, gc.GetGeometryN(i));
+                csWriter.InitPrevCoordinate();
+            }
         }
 
         private void WriteBoundingBox(BinaryWriter writer, CoordinateSequenceWriter csWriter, Geometry geometry)
@@ -359,9 +360,11 @@ namespace NetTopologySuite.IO
 
         private void WriteInterval(BinaryWriter writer, Interval interval, double scale)
         {
-            double last = 0d;
-            CoordinateSequenceWriter.WriteOrdinate(writer, interval.Min, scale, ref last);
-            CoordinateSequenceWriter.WriteOrdinate(writer, interval.Max, scale, ref last);
+            long last = 0;
+            long encValue = CoordinateSequenceWriter.EncodeOrdinate(interval.Min, scale, ref last);
+            writer.Write(VarintBitConverter.GetVarintBytes(encValue));
+            encValue = CoordinateSequenceWriter.EncodeOrdinate(interval.Max, scale, ref last);
+            writer.Write(VarintBitConverter.GetVarintBytes(encValue));
         }
 
         private class MinMaxFilter : ICoordinateSequenceFilter

@@ -19,7 +19,9 @@ namespace NetTopologySuite.IO.Test
 
         [TestCase("01000204", OgcGeometryType.Point)]
         [TestCase("02000202020808", OgcGeometryType.LineString)]
-        [TestCase("03031b000400040205000004000004030000030500000002020000010100", OgcGeometryType.Polygon)]
+        //This Polygon has repeated points, which are discarded.
+        //[TestCase("03031b000400040205000004000004030000030500000002020000010100", OgcGeometryType.Polygon)]
+        [TestCase("0303170004000402040400000403000003040002020000010100", OgcGeometryType.Polygon)]
         [TestCase("04070b0004020402000200020404", OgcGeometryType.MultiPoint)]
         [TestCase("020309020802080202020808", OgcGeometryType.LineString)]
         [TestCase("05030f020802080202020208080207050404", OgcGeometryType.MultiLineString)]
