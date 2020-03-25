@@ -49,10 +49,29 @@ namespace NetTopologySuite.IO
             {
                 if (position != 0)
                     ms.Seek(position, seekOrigin);
-                return Read(ms);
+                using (var br = new BinaryReader(ms, Encoding.UTF8, true))
+                    return Read(br);
             }
         }
 
+        /// <summary>
+        /// Method to read a <see cref="Geometry"/> from a <paramref name="buffer"/>. Optionally a starting position can be supplied.
+        /// </summary>
+        /// <param name="buffer">The input stream</param>
+        /// <param name="idList"></param>
+        /// <param name="position">The starting position</param>
+        /// <param name="seekOrigin">A value indicating how to interpret <paramref name="position"/></param>
+        /// <returns>A geometry</returns>
+        public Geometry Read(byte[] buffer, out long[] idList, long position = 0, SeekOrigin seekOrigin = SeekOrigin.Begin)
+        {
+            using (var ms = new MemoryStream(buffer))
+            {
+                if (position != 0)
+                    ms.Seek(position, seekOrigin);
+                using (var br = new BinaryReader(ms, Encoding.UTF8, true))
+                    return Read(br, out idList, true);
+            }
+        }
         /// <summary>
         /// Method to read a <see cref="Geometry"/> from a <see cref="Stream"/>.
         /// </summary>
@@ -72,7 +91,7 @@ namespace NetTopologySuite.IO
         public Geometry Read(Stream stream, out long[] idList)
         {
             using (var br = new BinaryReader(stream, Encoding.UTF8, true))
-                return Read(br, out idList);
+                return Read(br, out idList, true);
         }
 
         /// <summary>
@@ -155,6 +174,8 @@ namespace NetTopologySuite.IO
                     for (int i = 0; i < gc.NumGeometries; i++)
                         gc.GetGeometryN(i).UserData = idList[i];
                 }
+
+                exportIdList = false;
             }
 
             // invalidate idList if we don't want to export it.

@@ -292,13 +292,13 @@ namespace NetTopologySuite.IO.Test
                 Assert.That(args.IdList[i], Is.EqualTo(101 + i));
         }
 
-        private void CheckIds(GeometryCollection gc, IdFrom idFrom)
+        private void CheckIds(GeometryCollection gc, IdFrom idFrom, long[] idList = null)
         {
             if (!_emitIdList) return;
             if (idFrom == IdFrom.Event)
             {
-                //for (int i = 0; i < gc.NumGeometries; i++)
-                //    Assert.That(gc.GetGeometryN(i).UserData, Is.EqualTo(i + 101));
+                for (int i = 0; i < gc.NumGeometries; i++)
+                    Assert.That(gc.GetGeometryN(i).UserData, Is.Null);
             }
             else if (idFrom == IdFrom.UserData)
             {
@@ -308,7 +308,10 @@ namespace NetTopologySuite.IO.Test
             else 
             {
                 for (int i = 0; i < gc.NumGeometries; i++)
-                    Assert.That(gc.GetGeometryN(i).UserData, Is.EqualTo(201 + Fibonacci(i)));
+                {
+                    Assert.That(idList[i], Is.EqualTo(201 + Fibonacci(i)));
+                    Assert.That(gc.GetGeometryN(i).UserData, Is.Null);
+                }
             }
         }
 
@@ -346,13 +349,18 @@ namespace NetTopologySuite.IO.Test
                 rdr.IdentifiersProvided += handler;
 
             Geometry readGeometry = null;
-
-            Assert.That(() => readGeometry = rdr.Read(twkbData), Throws.Nothing);
+            long[] idList = null;
+            if (idFrom != IdFrom.Argument)
+                Assert.That(() => readGeometry = rdr.Read(twkbData), Throws.Nothing);
+            else
+            {
+                Assert.That(() => readGeometry = rdr.Read(twkbData, out idList), Throws.Nothing);
+            }
             Assert.That(readGeometry != null);
             Assert.That(readGeometry.OgcGeometryType, Is.EqualTo(geometry.OgcGeometryType));
 
             if (readGeometry is GeometryCollection gc)
-                CheckIds(gc, idFrom);
+                CheckIds(gc, idFrom, idList);
 
             TestContext.WriteLine();
         }

@@ -5,6 +5,7 @@
     <RootNamespace>NetTopologySuite.IO</RootNamespace>
     <SignAssembly>true</SignAssembly>
     <IsTestProject>false</IsTestProject>
+    <EnableApiCompat>true</EnableApiCompat>
   </PropertyGroup>
 
   <PropertyGroup Label="Assembly Info">
@@ -24,6 +25,13 @@
 
   <ItemGroup>
     <PackageReference Include="NetTopologySuite" Version="[2.0.0, 3.0.0-A)" />
+  </ItemGroup>
+
+  <ItemGroup Condition=" '$(EnableApiCompat)' == 'true' ">
+    <PackageReference Include="Microsoft.DotNet.ApiCompat" Version="5.0.0-beta.20162.3" PrivateAssets="All" />
+    <PackageDownload Include="NetTopologySuite.IO.TinyWKB" Version="[2.0.1]" PrivateAssets="All" />
+
+    <ResolvedMatchingContract Include="$(NugetPackageRoot)nettopologysuite\$(NtsMajorVersion).0.0\lib\netstandard2.0\NetTopologySuite.dll" />
   </ItemGroup>
 
 </Project>
