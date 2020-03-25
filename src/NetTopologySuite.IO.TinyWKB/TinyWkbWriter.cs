@@ -4,6 +4,7 @@ using System.IO;
 using System.Text;
 using NetTopologySuite.DataStructures;
 using NetTopologySuite.Geometries;
+using NetTopologySuite.Operation.Distance;
 
 namespace NetTopologySuite.IO
 {
@@ -86,13 +87,23 @@ namespace NetTopologySuite.IO
         /// <returns><paramref name="geometry"/> encoded in an array of bytes</returns>
         public byte[] Write(Geometry geometry)
         {
+            return Write(geometry, null);
+        }
+
+        /// <summary>
+        /// Function to write <paramref name="geometry"/> to an array of bytes.
+        /// </summary>
+        /// <param name="geometry">A geometry</param>
+        /// <param name="idList">A list of ids for geometries an a collection. Not used for atomic geometries</param>
+        /// <returns><paramref name="geometry"/> encoded in an array of bytes</returns>
+        public byte[] Write(Geometry geometry, long[] idList)
+        {
             using (var ms = new MemoryStream())
             {
-                Write(ms, geometry);
+                Write(ms, geometry, idList);
                 return ms.ToArray();
             }
         }
-
         /// <summary>
         /// Method to write <paramref name="geometry"/> TinyWKB encoded to a stream.
         /// </summary>
@@ -100,8 +111,19 @@ namespace NetTopologySuite.IO
         /// <param name="geometry">A geometry</param>
         public void Write(Stream stream, Geometry geometry)
         {
+            Write(stream, geometry, null);
+        }
+
+        /// <summary>
+        /// Method to write <paramref name="geometry"/> TinyWKB encoded to a stream.
+        /// </summary>
+        /// <param name="stream">A stream</param>
+        /// <param name="geometry">A geometry</param>
+        /// <param name="idList">A list of ids for geometries an a collection. Not used for atomic geometries</param>
+        public void Write(Stream stream, Geometry geometry, long[] idList)
+        {
             using (var writer = new BinaryWriter(stream, Encoding.UTF8, true))
-                Write(writer, geometry);
+                Write(writer, geometry, idList);
         }
 
         /// <summary>
@@ -111,8 +133,19 @@ namespace NetTopologySuite.IO
         /// <param name="geometry">A geometry</param>
         public void Write(BinaryWriter writer, Geometry geometry)
         {
+            Write(writer, geometry, null);
+        }
+        /// <summary>
+        /// Method to write <paramref name="geometry"/> TinyWKB encoded using a binary writer.
+        /// </summary>
+        /// <param name="writer">A binary writer</param>
+        /// <param name="geometry">A geometry</param>
+        /// <param name="idList">A list of ids for geometries an a collection. Not used for atomic geometries</param>
+        public void Write(BinaryWriter writer, Geometry geometry, long[] idList)
+        {
             // Create and write header
-            var header = ToHeader(geometry);
+            idList = GetIdList(geometry, idList);
+            var header = ToHeader(geometry, idList != null);
             TinyWkbHeader.Write(writer, header);
 
             // If we need to emit size, write geometry information to memory stream
@@ -122,7 +155,7 @@ namespace NetTopologySuite.IO
                 {
                     using (var geomWriter = new BinaryWriter(ms, Encoding.UTF8, true))
                     {
-                        WriteGeometry(geomWriter, header, geometry);
+                        WriteGeometry(geomWriter, header, geometry, idList);
                     }
                     writer.Write(VarintBitConverter.GetVarintBytes((ulong)ms.Length));
                     writer.Write(ms.GetBuffer(), 0, (int)ms.Position);
@@ -131,11 +164,11 @@ namespace NetTopologySuite.IO
             // If not, just write geometry
             else
             {
-                WriteGeometry(writer, header, geometry);
+                WriteGeometry(writer, header, geometry, idList);
             }
         }
 
-        private void WriteGeometry(BinaryWriter writer, TinyWkbHeader header, Geometry geometry)
+        private void WriteGeometry(BinaryWriter writer, TinyWkbHeader header, Geometry geometry, long[] idList)
         {
             // If geometry is empty, no more information needs to be written.
             if (geometry.IsEmpty) return;
@@ -143,12 +176,12 @@ namespace NetTopologySuite.IO
             // if we have a geometry collection
             if (geometry.OgcGeometryType == OgcGeometryType.GeometryCollection)
             {
-                WriteGeometryCollection(writer, header, (GeometryCollection)geometry);
+                WriteGeometryCollection(writer, header, (GeometryCollection)geometry, idList);
                 return;
             }
 
             var csWriter = new CoordinateSequenceWriter(header);
-            double[] initialLast = new double[csWriter.Dimension];//System.Buffers.ArrayPool<double>.Shared.Rent(csWriter.Dimension);
+            Span<double> initialLast = stackalloc double[csWriter.Dimension];
             switch (geometry.OgcGeometryType)
             {
                 case OgcGeometryType.Point:
@@ -161,13 +194,13 @@ namespace NetTopologySuite.IO
                     WritePolygon(writer, csWriter, (Polygon)geometry, initialLast);
                     break;
                 case OgcGeometryType.MultiPoint:
-                    WriteMultiPoint(writer, csWriter, (MultiPoint)geometry, initialLast);
+                    WriteMultiPoint(writer, csWriter, (MultiPoint)geometry, initialLast, idList);
                     break;
                 case OgcGeometryType.MultiLineString:
-                    WriteMultiLineString(writer, csWriter, (MultiLineString)geometry, initialLast);
+                    WriteMultiLineString(writer, csWriter, (MultiLineString)geometry, initialLast, idList);
                     break;
                 case OgcGeometryType.MultiPolygon:
-                    WriteMultiPolygon(writer, csWriter, (MultiPolygon)geometry, initialLast);
+                    WriteMultiPolygon(writer, csWriter, (MultiPolygon)geometry, initialLast, idList);
                     break;
                 default:
                     throw new ArgumentException(nameof(geometry));
@@ -176,19 +209,19 @@ namespace NetTopologySuite.IO
             //System.Buffers.ArrayPool<double>.Shared.Return(initialLast, true);
         }
 
-        private void WritePoint(BinaryWriter writer, CoordinateSequenceWriter csWriter, Point point, double[] last)
+        private void WritePoint(BinaryWriter writer, CoordinateSequenceWriter csWriter, Point point, Span<double> last)
         {
             // We don't write bounding boxes for points. Period.
             csWriter.Write(writer, point.CoordinateSequence, last, 0);
         }
 
-        private void WriteLineString(BinaryWriter writer, CoordinateSequenceWriter csWriter, LineString lineString, double[] last)
+        private void WriteLineString(BinaryWriter writer, CoordinateSequenceWriter csWriter, LineString lineString, Span<double> last)
         {
             WriteBoundingBox(writer, csWriter, lineString);
             csWriter.Write(writer, lineString.CoordinateSequence, last, 0);
         }
 
-        private void WritePolygon(BinaryWriter writer, CoordinateSequenceWriter csWriter, Polygon polygon, double[] last, bool omitBoundingBox = false)
+        private void WritePolygon(BinaryWriter writer, CoordinateSequenceWriter csWriter, Polygon polygon, Span<double> last, bool omitBoundingBox = false)
         {
             if (!omitBoundingBox) WriteBoundingBox(writer, csWriter, polygon);
             writer.Write(VarintBitConverter.GetVarintBytes((uint)(1 + polygon.NumInteriorRings)));
@@ -197,39 +230,43 @@ namespace NetTopologySuite.IO
                 csWriter.Write(writer, polygon.GetInteriorRingN(i).CoordinateSequence, last, 1);
         }
 
-        private void WriteMultiPoint(BinaryWriter writer, CoordinateSequenceWriter csWriter, MultiPoint multiPoint, double[] last)
+        private void WriteMultiPoint(BinaryWriter writer, CoordinateSequenceWriter csWriter, MultiPoint multiPoint,
+            Span<double> last, long[] idList)
         {
             WriteBoundingBox(writer, csWriter, multiPoint);
             writer.Write(VarintBitConverter.GetVarintBytes((uint)multiPoint.NumGeometries));
-            WriteIdList(writer, multiPoint);
+            WriteIdList(writer, multiPoint, idList);
             for (int i = 0; i < multiPoint.NumGeometries; i++)
                 csWriter.Write(writer, ((Point)multiPoint.GetGeometryN(i)).CoordinateSequence, last, 0);
         }
 
-        private void WriteMultiLineString(BinaryWriter writer, CoordinateSequenceWriter csWriter, MultiLineString multiLineString, double[] last)
+        private void WriteMultiLineString(BinaryWriter writer, CoordinateSequenceWriter csWriter,
+            MultiLineString multiLineString, Span<double> last, long[] idList)
         {
             WriteBoundingBox(writer, csWriter, multiLineString);
             writer.Write(VarintBitConverter.GetVarintBytes((uint)multiLineString.NumGeometries));
-            WriteIdList(writer, multiLineString);
+            WriteIdList(writer, multiLineString, idList);
             for (int i = 0; i < multiLineString.NumGeometries; i++)
                 csWriter.Write(writer, ((LineString)multiLineString.GetGeometryN(i)).CoordinateSequence, last, 0);
         }
 
-        private void WriteMultiPolygon(BinaryWriter writer, CoordinateSequenceWriter csWriter, MultiPolygon multiPolygon, double[] last)
+        private void WriteMultiPolygon(BinaryWriter writer, CoordinateSequenceWriter csWriter,
+            MultiPolygon multiPolygon, Span<double> last, long[] idList)
         {
             WriteBoundingBox(writer, csWriter, multiPolygon);
             writer.Write(VarintBitConverter.GetVarintBytes((uint)multiPolygon.NumGeometries));
-            WriteIdList(writer, multiPolygon);
+            WriteIdList(writer, multiPolygon, idList);
             for (int i = 0; i < multiPolygon.NumGeometries; i++)
                 WritePolygon(writer, csWriter, (Polygon)multiPolygon.GetGeometryN(i), last, true);
         }
 
-        private void WriteGeometryCollection(BinaryWriter writer, TinyWkbHeader header, GeometryCollection gc)
+        private void WriteGeometryCollection(BinaryWriter writer, TinyWkbHeader header, GeometryCollection gc,
+            long[] idList)
         {
             var csWriter = new CoordinateSequenceWriter(header);
             WriteBoundingBox(writer, csWriter, gc);
             writer.Write(VarintBitConverter.GetVarintBytes((uint)gc.NumGeometries));
-            WriteIdList(writer, gc);
+            WriteIdList(writer, gc, idList);
             for (int i = 0; i < gc.NumGeometries; i++)
                 Write(writer, gc.GetGeometryN(i));
         }
@@ -253,30 +290,71 @@ namespace NetTopologySuite.IO
             return System.Threading.Interlocked.Increment(ref _nextId);
         }
 
-        private void WriteIdList(BinaryWriter writer, GeometryCollection gc)
+        /// <summary>
+        /// Event raised when a list of id values is required
+        /// </summary>
+        public event EventHandler<IdentifiersEventArgs> IdentifiersRequired;
+
+        private void WriteIdList(BinaryWriter writer, GeometryCollection gc, long[] idList)
         {
             if (!EmitIdList) return;
 
-            long[] idList = new long[gc.Count];
-            try
-            {
-                for (int i = 0; i < gc.Count; i++)
-                {
-                    object userData = gc.GetGeometryN(i)?.UserData;
-                    if (userData is IConvertible convertibleUserData)
-                        idList[i] = convertibleUserData.ToInt64(NumberFormatInfo.InvariantInfo);
-                    else
-                        throw new Exception("No Id in UserData");
-                }
-            } 
-            catch
-            {
-                for (int i = 0; i < gc.Count; i++)
-                    idList[i] = GetNextId();
-            }
-
             for (int i = 0; i < gc.Count; i++)
                 writer.Write(VarintBitConverter.GetVarintBytes(idList[i]));
+        }
+
+        /// <summary>
+        /// Checks if an idList is provided for a geometry collection
+        /// </summary>
+        /// <param name="geom">The geometry to test</param>
+        /// <param name="idList">The provided idList</param>
+        /// <returns>The idList</returns>
+        private long[] GetIdList(Geometry geom, long[] idList)
+        {
+            var gc = geom as GeometryCollection;
+            if (gc == null || !EmitIdList) return null;
+
+            if (idList == null || idList.Length != gc.NumGeometries)
+            {
+                idList = new long[gc.Count];
+                var h = IdentifiersRequired;
+                if (h != null)
+                {
+                    var args = new IdentifiersEventArgs(gc, idList);
+                    h(this, args);
+                }
+                else
+                {
+                    bool fallback = false;
+                    for (int i = 0; i < idList.Length; i++)
+                    {
+                        object userData = gc.GetGeometryN(i).UserData;
+                        if (userData is null)
+                        {
+                            fallback = true;
+                            break;
+                        }
+
+                        try
+                        {
+                            idList[i] = Convert.ToInt64(userData, CultureInfo.InvariantCulture);
+                        }
+                        catch
+                        {
+                            fallback = true;
+                            break;
+                        }
+                    }
+
+                    if (fallback)
+                    {
+                        for (int i = 0; i < idList.Length; i++)
+                            idList[i] = GetNextId();
+                    }
+                }
+            }
+
+            return idList;
         }
 
         private void WriteInterval(BinaryWriter writer, Interval interval, double scale)
@@ -316,19 +394,22 @@ namespace NetTopologySuite.IO
         }
 
 
-        private TinyWkbHeader ToHeader(Geometry geometry)
+        private TinyWkbHeader ToHeader(Geometry geometry, bool hasIdList)
         {
             TinyWkbGeometryType type;
             switch (geometry.OgcGeometryType)
             {
                 case OgcGeometryType.Point:
                     type = TinyWkbGeometryType.Point;
+                    hasIdList = false;
                     break;
                 case OgcGeometryType.LineString:
                     type = TinyWkbGeometryType.LineString;
+                    hasIdList = false;
                     break;
                 case OgcGeometryType.Polygon:
                     type = TinyWkbGeometryType.Polygon;
+                    hasIdList = false;
                     break;
                 case OgcGeometryType.MultiPoint:
                     type = TinyWkbGeometryType.MultiPoint;
@@ -352,7 +433,7 @@ namespace NetTopologySuite.IO
             bool hasM = c is CoordinateM || c is CoordinateZM;
 
             return new TinyWkbHeader(type, PrecisionXY, geometry.IsEmpty,
-                EmitBoundingBox, EmitSize, EmitIdList,
+                EmitBoundingBox, EmitSize, EmitIdList & hasIdList,
                 EmitZ & hasZ, PrecisionZ,
                 EmitM & hasM, PrecisionM);
         }

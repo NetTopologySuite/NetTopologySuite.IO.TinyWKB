@@ -164,6 +164,21 @@ namespace NetTopologySuite.IO.Test
 
             byte[] twkbData = TestWrite(mp);
             TestReRead(mp, twkbData);
+
+            twkbData = TestWrite(mp, HandleIdsRequested);
+            TestReRead(mp, twkbData, HandleIdsProvided, IdFrom.Event);
+
+            twkbData = TestWrite(mp, idList: GetIdList(mp.Count));
+            TestReRead(mp, twkbData, idFrom: IdFrom.Argument);
+
+        }
+
+        private long[] GetIdList(in int num)
+        {
+            long[] res = new long[num];
+            for (int i = 0; i < num; i++)
+                res[i] = 201 + Fibonacci(i);
+            return res;
         }
 
         [Test]
@@ -176,6 +191,12 @@ namespace NetTopologySuite.IO.Test
 
             byte[] twkbData = TestWrite(mls);
             TestReRead(mls, twkbData);
+
+            twkbData = TestWrite(mls, HandleIdsRequested);
+            TestReRead(mls, twkbData, HandleIdsProvided, IdFrom.Event); 
+
+            twkbData = TestWrite(mls, idList: GetIdList(mls.Count));
+            TestReRead(mls, twkbData, idFrom: IdFrom.Argument);
         }
 
         [Test]
@@ -193,6 +214,12 @@ namespace NetTopologySuite.IO.Test
 
             byte[] twkbData = TestWrite(mp);
             TestReRead(mp, twkbData);
+
+            twkbData = TestWrite(mp, HandleIdsRequested);
+            TestReRead(mp, twkbData, HandleIdsProvided, IdFrom.Event);
+
+            twkbData = TestWrite(mp, idList: GetIdList(mp.Count));
+            TestReRead(mp, twkbData, idFrom: IdFrom.Argument);
         }
 
         [Test]
@@ -214,6 +241,12 @@ namespace NetTopologySuite.IO.Test
 
             byte[] twkbData = TestWrite(gc);
             TestReRead(gc, twkbData);
+
+            twkbData = TestWrite(gc, HandleIdsRequested);
+            TestReRead(gc, twkbData, HandleIdsProvided, IdFrom.Event);
+
+            twkbData = TestWrite(gc, idList: GetIdList(gc.Count));
+            TestReRead(gc, twkbData, idFrom: IdFrom.Argument);
         }
 
         [Test]
@@ -242,21 +275,55 @@ namespace NetTopologySuite.IO.Test
                 gc.GetGeometryN(i).UserData = (1 + i) * 10;
         }
 
-        private void ChecIds(GeometryCollection gc)
+        private void HandleIdsRequested(object item, IdentifiersEventArgs args)
+        {
+            if (!_emitIdList) Assert.Fail();
+
+            for (int i = 0; i < args.Count; i++)
+                args.IdList[i] = 101 + i;
+        }
+
+        private void HandleIdsProvided(object item, IdentifiersEventArgs args)
+        {
+            if (!_emitIdList) Assert.Fail();
+
+            Assert.That(args.Count, Is.EqualTo(args.Geometry.Count));
+            for (int i = 0; i < args.Count; i++)
+                Assert.That(args.IdList[i], Is.EqualTo(101 + i));
+        }
+
+        private void CheckIds(GeometryCollection gc, IdFrom idFrom)
         {
             if (!_emitIdList) return;
-            for (int i = 0; i < gc.NumGeometries; i++)
+            if (idFrom == IdFrom.Event)
             {
-                Assert.That(gc.GetGeometryN(i).UserData, Is.EqualTo((1 + i) * 10));
+                //for (int i = 0; i < gc.NumGeometries; i++)
+                //    Assert.That(gc.GetGeometryN(i).UserData, Is.EqualTo(i + 101));
+            }
+            else if (idFrom == IdFrom.UserData)
+            {
+                for (int i = 0; i < gc.NumGeometries; i++)
+                    Assert.That(gc.GetGeometryN(i).UserData, Is.EqualTo((1 + i) * 10));
+            }
+            else 
+            {
+                for (int i = 0; i < gc.NumGeometries; i++)
+                    Assert.That(gc.GetGeometryN(i).UserData, Is.EqualTo(201 + Fibonacci(i)));
             }
         }
 
-        private byte[] TestWrite(Geometry geometry)
+        private byte[] TestWrite(Geometry geometry, EventHandler<IdentifiersEventArgs> handler = null, long[] idList = null)
         {
             var wrtr = CreateWriter();
+            if (handler != null)
+                wrtr.IdentifiersRequired += handler;
+
             byte[] data = null;
 
-            Assert.That(() => data = wrtr.Write(geometry), Throws.Nothing);
+            if (idList == null)
+                Assert.That(() => data = wrtr.Write(geometry), Throws.Nothing);
+            else
+                Assert.That(() => data = wrtr.Write(geometry, idList), Throws.Nothing);
             Assert.That(data, Is.Not.Null);
             Assert.That(data.Length, Is.GreaterThan(0));
 
@@ -265,10 +332,19 @@ namespace NetTopologySuite.IO.Test
             return data;
         }
 
+        private enum IdFrom
+        {
+            UserData,
+            Event,
+            Argument
+        }
 
-        private void TestReRead(Geometry geometry, byte[] twkbData)
+        private void TestReRead(Geometry geometry, byte[] twkbData, EventHandler<IdentifiersEventArgs> handler = null, IdFrom idFrom = IdFrom.UserData)
         {
             var rdr = new TinyWkbReader();
+            if (handler != null)
+                rdr.IdentifiersProvided += handler;
+
             Geometry readGeometry = null;
 
             Assert.That(() => readGeometry = rdr.Read(twkbData), Throws.Nothing);
@@ -276,7 +352,7 @@ namespace NetTopologySuite.IO.Test
             Assert.That(readGeometry.OgcGeometryType, Is.EqualTo(geometry.OgcGeometryType));
 
             if (readGeometry is GeometryCollection gc)
-                ChecIds(gc);
+                CheckIds(gc, idFrom);
 
             TestContext.WriteLine();
         }
@@ -327,5 +403,20 @@ namespace NetTopologySuite.IO.Test
             new[] {new[] {135d, 35d}, new[] {135d, 40d}, new[] {140d, 40d}, new[] {140d, 35d}, new[] {135d, 35d}}
 
         };
+
+        private static int Fibonacci(int n)
+        {
+            int a = 0;
+            int b = 1;
+            // In N steps compute Fibonacci sequence iteratively.
+            for (int i = 0; i < n; i++)
+            {
+                int temp = a;
+                a = b;
+                b = temp + b;
+            }
+            return a;
+        }
+
     }
 }

@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using NetTopologySuite.DataStructures;
 using NetTopologySuite.Geometries;
+using NetTopologySuite.Utilities;
 
 //[assembly: InternalsVisibleTo("NetTopologySuite.IO.TinyWKB.Test")]
 
@@ -59,8 +60,19 @@ namespace NetTopologySuite.IO
         /// <returns>A geometry</returns>
         public Geometry Read(Stream stream)
         {
+            return Read(stream, out _);
+        }
+
+        /// <summary>
+        /// Method to read a <see cref="Geometry"/> from a <see cref="Stream"/>.
+        /// </summary>
+        /// <param name="stream">The input stream</param>
+        /// <param name="idList">An array of identifiers if present</param>
+        /// <returns>A geometry</returns>
+        public Geometry Read(Stream stream, out long[] idList)
+        {
             using (var br = new BinaryReader(stream, Encoding.UTF8, true))
-                return Read(br);
+                return Read(br, out idList);
         }
 
         /// <summary>
@@ -70,6 +82,20 @@ namespace NetTopologySuite.IO
         /// <returns>A geometry</returns>
         public Geometry Read(BinaryReader reader)
         {
+            return Read(reader, out _);
+        }
+
+        /// <summary>
+        /// Method to read a <see cref="Geometry"/> using a <see cref="BinaryReader"/>.
+        /// </summary>
+        /// <param name="reader">The reader</param>
+        /// <param name="idList">An array of identifiers if present</param>
+        /// <param name="exportIdList">A flag indicating if the list of ids should be exported.</param>
+        /// <returns>A geometry</returns>
+        public Geometry Read(BinaryReader reader, out long[] idList, bool exportIdList = false)
+        {
+            idList = null;
+
             // Read the common, extended header information
             var header = TinyWkbHeader.Read(reader);
 
@@ -90,6 +116,7 @@ namespace NetTopologySuite.IO
 
             // Based on header information, build a coordinate sequence reader
             var coordinateReader = new CoordinateSequenceReader(_factory.CoordinateSequenceFactory, header);
+            GeometryCollection gc = null;
             switch (header.GeometryType)
             {
                 case TinyWkbGeometryType.Point:
@@ -99,16 +126,42 @@ namespace NetTopologySuite.IO
                 case TinyWkbGeometryType.Polygon:
                     return ReadPolygon(reader, coordinateReader);
                 case TinyWkbGeometryType.MultiPoint:
-                    return ReadMultiPoint(reader, header, coordinateReader);
+                    gc = ReadMultiPoint(reader, header, coordinateReader, out idList);
+                    break;
                 case TinyWkbGeometryType.MultiLineString:
-                    return ReadMultiLineString(reader, header, coordinateReader);
+                    gc = ReadMultiLineString(reader, header, coordinateReader, out idList);
+                    break;
                 case TinyWkbGeometryType.MultiPolygon:
-                    return ReadMultiPolygon(reader, header, coordinateReader);
+                    gc = ReadMultiPolygon(reader, header, coordinateReader, out idList);
+                    break;
                 case TinyWkbGeometryType.GeometryCollection:
-                    return ReadGeometryCollection(reader, header);
+                    gc =  ReadGeometryCollection(reader, header, out idList);
+                    break;
             }
 
-            throw new NotSupportedException();
+            if (gc == null)
+                Assert.ShouldNeverReachHere();
+
+            // If we have an idList and don't want to export it, use alternatives
+            if (idList != null && !exportIdList)
+            {
+                var handler = IdentifiersProvided;
+                if (handler != null)
+                {
+                    handler.Invoke(this, new IdentifiersEventArgs(gc, idList));
+                }
+                else
+                {
+                    for (int i = 0; i < gc.NumGeometries; i++)
+                        gc.GetGeometryN(i).UserData = idList[i];
+                }
+            }
+
+            // invalidate idList if we don't want to export it.
+            if (!exportIdList)
+                idList = null;
+
+            return gc;
         }
 
         private Geometry CreateEmpty(TinyWkbHeader header)
@@ -167,55 +220,49 @@ namespace NetTopologySuite.IO
             return _factory.CreatePolygon(shell, holes);
         }
 
-        private MultiPoint ReadMultiPoint(BinaryReader reader, TinyWkbHeader header, CoordinateSequenceReader csReader)
+        public event EventHandler<IdentifiersEventArgs> IdentifiersProvided;
+
+        private MultiPoint ReadMultiPoint(BinaryReader reader, TinyWkbHeader header, CoordinateSequenceReader csReader, out long[] idList)
         {
             int numPoints = (int) ReadUVarint(reader);
-            long[] idList = ReadIdList(reader, header, numPoints);
+            idList = ReadIdList(reader, header, numPoints);
             var sequence = csReader.Read(reader, numPoints);
             var res = _factory.CreateMultiPoint(sequence);
-            for (int i = 0; i < numPoints; i++)
-                res.GetGeometryN(i).UserData = idList[i];
+
             return res;
         }
 
-        private MultiLineString ReadMultiLineString(BinaryReader reader, TinyWkbHeader header, CoordinateSequenceReader csReader)
+        private MultiLineString ReadMultiLineString(BinaryReader reader, TinyWkbHeader header,
+            CoordinateSequenceReader csReader, out long[] idList)
         {
             int numLineStrings = (int)ReadUVarint(reader);
-            long[] idList = ReadIdList(reader, header, numLineStrings);
+            idList = ReadIdList(reader, header, numLineStrings);
             var lineStrings = new LineString[numLineStrings];
             for (int i = 0; i < numLineStrings; i++)
-            {
                 lineStrings[i] = ReadLineString(reader, csReader);
-                lineStrings[i].UserData = idList[i];
-            }
 
             return _factory.CreateMultiLineString(lineStrings);
         }
-        private MultiPolygon ReadMultiPolygon(BinaryReader reader, TinyWkbHeader header, CoordinateSequenceReader csReader)
+        private MultiPolygon ReadMultiPolygon(BinaryReader reader, TinyWkbHeader header,
+            CoordinateSequenceReader csReader, out long[] idList)
         {
             int numPolygons = (int)ReadUVarint(reader);
-            long[] idList = ReadIdList(reader, header, numPolygons);
+            idList = ReadIdList(reader, header, numPolygons);
             var polygons = new Polygon[numPolygons];
 
             for (int i = 0; i < numPolygons; i++)
-            {
                 polygons[i] = ReadPolygon(reader, csReader);
-                polygons[i].UserData = idList[i];
-            }
 
             return _factory.CreateMultiPolygon(polygons);
         }
 
-        private GeometryCollection ReadGeometryCollection(BinaryReader reader, TinyWkbHeader header)
+        private GeometryCollection ReadGeometryCollection(BinaryReader reader, TinyWkbHeader header, out long[] idList)
         {
             int numGeometries = (int) ReadUVarint(reader);
             var geometries = new Geometry[numGeometries];
-            long[] idList = ReadIdList(reader, header, numGeometries);
+            idList = ReadIdList(reader, header, numGeometries);
             for (int i = 0; i < numGeometries; i++)
-            {
                 geometries[i] = Read(reader);
-                geometries[i].UserData = idList[i];
-            }
 
             return _factory.CreateGeometryCollection(geometries);
         }
@@ -245,9 +292,11 @@ namespace NetTopologySuite.IO
 
         private long[] ReadIdList(BinaryReader reader, TinyWkbHeader header, int numGeometries)
         {
+            if (!header.HasIdList) return null;
+
             long[] res = new long[numGeometries];
             for (int i = 0; i < numGeometries; i++)
-                res[i] = header.HasIdList ? ReadVarint(reader) : i;
+                res[i] = ReadVarint(reader);
             return res;
         }
 
