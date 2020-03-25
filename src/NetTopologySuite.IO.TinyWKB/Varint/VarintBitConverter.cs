@@ -4,12 +4,12 @@
 // VarintConverter was created and is maintained by
 // Tomáš Pastorek (https://github.com/topas).
 // It was released under BSD license
-using System.Buffers;
 
 namespace System
 {
-    internal class VarintBitConverter
+    internal static class VarintBitConverter
     {
+        /*
         /// <summary>
         /// Returns the specified byte value as varint encoded array of bytes.   
         /// </summary>
@@ -27,7 +27,7 @@ namespace System
         /// <returns>Varint array of bytes.</returns>
         public static byte[] GetVarintBytes(short value)
         {
-            var zigzag = EncodeZigZag(value, 16);
+            long zigzag = EncodeZigZag(value, 16);
             return GetVarintBytes((ulong)zigzag);
         }
 
@@ -48,10 +48,10 @@ namespace System
         /// <returns>Varint array of bytes.</returns>
         public static byte[] GetVarintBytes(int value)
         {
-            var zigzag = EncodeZigZag(value, 32);
+            long zigzag = EncodeZigZag(value, 32);
             return GetVarintBytes((ulong)zigzag);
         }
-
+        */
         /// <summary>
         /// Returns the specified 32-bit unsigned value as varint encoded array of bytes.   
         /// </summary>
@@ -69,10 +69,10 @@ namespace System
         /// <returns>Varint array of bytes.</returns>
         public static byte[] GetVarintBytes(long value)
         {
-            var zigzag = EncodeZigZag(value, 64);
+            long zigzag = EncodeZigZag(value, 64);
             return GetVarintBytes((ulong)zigzag);
         }
-
+        
         /// <summary>
         /// Returns the specified 64-bit unsigned value as varint encoded array of bytes.   
         /// </summary>
@@ -80,11 +80,11 @@ namespace System
         /// <returns>Varint array of bytes.</returns>
         public static byte[] GetVarintBytes(ulong value)
         {
-            var buffer = ArrayPool<byte>.Shared.Rent(10);
-            var pos = 0;
+            Span<byte> buffer = stackalloc byte[10];
+            int pos = 0;
             do
             {
-                var byteVal = value & 0x7f;
+                ulong byteVal = value & 0x7f;
                 value >>= 7;
 
                 if (value != 0)
@@ -96,11 +96,7 @@ namespace System
 
             } while (value != 0);
 
-            var result = new byte[pos];
-            Buffer.BlockCopy(buffer, 0, result, 0, pos);
-            ArrayPool<byte>.Shared.Return(buffer);
-
-            return result;
+            return buffer.Slice(0, pos).ToArray();
         }
 
         /// <summary>
@@ -125,7 +121,7 @@ namespace System
         {
             do
             {
-                var byteVal = value & 0x7f;
+                ulong byteVal = value & 0x7f;
                 value >>= 7;
 
                 if (value != 0)
@@ -144,7 +140,7 @@ namespace System
         /// <returns>64-bit signed value</returns>
         public static long ToInt64(ReadOnlySpan<byte> bytes)
         {
-            var zigzag = ToTarget(bytes, 64);
+            ulong zigzag = ToTarget(bytes, 64);
             return DecodeZigZag(zigzag);
         }
 
@@ -185,7 +181,7 @@ namespace System
 
                 if (shift > sizeBites)
                 {
-                    throw new ArgumentOutOfRangeException("bytes", "Byte array is too large.");
+                    throw new ArgumentOutOfRangeException(nameof(bytes), "Byte array is too large.");
                 }
 
                 if ((byteValue & 0x80) != 0x80)
@@ -196,7 +192,7 @@ namespace System
                 shift += 7;
             }
 
-            throw new ArgumentException("Cannot decode varint from byte array.", "bytes");
+            throw new ArgumentException("Cannot decode varint from byte array.", nameof(bytes));
         }
     }
 }

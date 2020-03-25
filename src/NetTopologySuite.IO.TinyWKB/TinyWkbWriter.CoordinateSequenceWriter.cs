@@ -9,7 +9,7 @@ namespace NetTopologySuite.IO
     {
         private class CoordinateSequenceWriter {
 
-            private delegate void WriteVarintsFn(BinaryWriter writer, CoordinateSequence sequence, int index, double[] last);
+            private delegate void WriteVarintsFn(BinaryWriter writer, CoordinateSequence sequence, int index, Span<double> last);
             private readonly int _dimension;
             private readonly int _measures;
 
@@ -19,7 +19,7 @@ namespace NetTopologySuite.IO
             {
                 int dimension = 2;
                 int measures = 0;
-                double[] scales = ArrayPool<double>.Shared.Rent(4);
+                Span<double> scales = stackalloc double[4];
                 scales[0] = scales[1] = header.ScaleX();
                 if (header.HasExtendedPrecisionInformation)
                 {
@@ -45,9 +45,7 @@ namespace NetTopologySuite.IO
 
                 _dimension = dimension;
                 _measures = measures;
-                Scales = new ReadOnlySpan<double>(scales, 0, dimension).ToArray();
-
-                ArrayPool<double>.Shared.Return(scales, true);
+                Scales = scales.Slice(0, dimension).ToArray();
             }
 
             /// <summary>
@@ -59,7 +57,7 @@ namespace NetTopologySuite.IO
 
             public double[] Scales { get; }
 
-            public void Write(BinaryWriter writer, CoordinateSequence sequence, double[] last, int omit)
+            public void Write(BinaryWriter writer, CoordinateSequence sequence, Span<double> last, int omit)
             {
                 if (sequence == null || sequence.Count == 0)
                     return;
@@ -71,27 +69,27 @@ namespace NetTopologySuite.IO
                     _writeVarintsFn(writer, sequence, i,  last);
             }
 
-            private void WriteVarints2D(BinaryWriter writer, CoordinateSequence sequence, int index, double[] last)
+            private void WriteVarints2D(BinaryWriter writer, CoordinateSequence sequence, int index, Span<double> last)
             {
                 WriteOrdinate(writer, sequence.GetX(index), Scales[0], ref last[0]);
                 WriteOrdinate(writer, sequence.GetY(index), Scales[1], ref last[1]);
             }
 
-            private void WriteVarints2DM(BinaryWriter writer, CoordinateSequence sequence, int index, double[] last)
+            private void WriteVarints2DM(BinaryWriter writer, CoordinateSequence sequence, int index, Span<double> last)
             {
                 WriteOrdinate(writer, sequence.GetX(index), Scales[0], ref last[0]);
                 WriteOrdinate(writer, sequence.GetY(index), Scales[1], ref last[1]);
                 WriteOrdinate(writer, sequence.GetM(index), Scales[2], ref last[2]);
             }
 
-            private void WriteVarints3D(BinaryWriter writer, CoordinateSequence sequence, int index, double[] last)
+            private void WriteVarints3D(BinaryWriter writer, CoordinateSequence sequence, int index, Span<double> last)
             {
                 WriteOrdinate(writer, sequence.GetX(index), Scales[0], ref last[0]);
                 WriteOrdinate(writer, sequence.GetY(index), Scales[1], ref last[1]);
                 WriteOrdinate(writer, sequence.GetZ(index), Scales[2], ref last[2]);
             }
 
-            private void WriteVarints3DM(BinaryWriter writer, CoordinateSequence sequence, int index, double[] last)
+            private void WriteVarints3DM(BinaryWriter writer, CoordinateSequence sequence, int index, Span<double> last)
             {
                 WriteOrdinate(writer, sequence.GetX(index), Scales[0], ref last[0]);
                 WriteOrdinate(writer, sequence.GetY(index), Scales[1], ref last[1]);
