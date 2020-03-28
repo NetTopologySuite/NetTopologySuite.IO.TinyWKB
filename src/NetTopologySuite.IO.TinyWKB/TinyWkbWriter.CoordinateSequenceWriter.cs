@@ -50,16 +50,15 @@ namespace NetTopologySuite.IO
 
             public Ordinate[] OutputOrdinates { get; }
 
-            public void Write(BinaryWriter writer, CoordinateSequence sequence, int coordinatesRequired, bool skipLastCoordinate = false, bool writeCount = false)
+            public void Write(BinaryWriter writer, CoordinateSequence sequence, bool skipLastCoordinate = false, bool writeCount = false)
             {
                 if (sequence == null || sequence.Count == 0)
                     return;
 
-                int inputCount = sequence.Count - (skipLastCoordinate ? 1 : 0);
-                int outputCount = Math.Max(inputCount, coordinatesRequired);
+                int count = sequence.Count - (skipLastCoordinate ? 1 : 0);
 
                 if (writeCount)
-                    writer.Write(VarintBitConverter.GetVarintBytes((uint)outputCount));
+                    writer.Write(VarintBitConverter.GetVarintBytes((uint)count));
 
                 ReadOnlySpan<double> scales = _scales;
                 Span<long> prevCoordinate = _prevCoordinate;
@@ -70,7 +69,7 @@ namespace NetTopologySuite.IO
                     sequence.TryGetOrdinateIndex(OutputOrdinates[i], out ordinateIndexes[i]);
                 }
 
-                for (int i = 0; i < inputCount; i++)
+                for (int i = 0; i < count; i++)
                 {
                     // Encode ordinate values
                     for (int dim = 0; dim < ordinateIndexes.Length; dim++)
@@ -80,26 +79,6 @@ namespace NetTopologySuite.IO
                             : sequence.GetOrdinate(i, ordinateIndexes[dim]);
                         long enc = EncodeOrdinate(val, scales[dim], ref prevCoordinate[dim]);
                         writer.Write(VarintBitConverter.GetVarintBytes(enc));
-                    }
-                }
-
-                if (inputCount < outputCount)
-                {
-                    // Write 0's for required coordinates: first coordinate after the input is a
-                    // special-case to reset the "prev" markers to 0.
-                    for (int dim = 0; dim < prevCoordinate.Length; dim++)
-                    {
-                        writer.Write(VarintBitConverter.GetVarintBytes(-prevCoordinate[dim]));
-                    }
-
-                    prevCoordinate.Clear();
-
-                    // remaining values to write (if any) are all 0, so just write that however many
-                    // times we need to.  it shouldn't be more than 4.
-                    int zeroCount = (outputCount - inputCount - 1) * prevCoordinate.Length;
-                    for (int i = 0; i < zeroCount; i++)
-                    {
-                        writer.Write((byte)0);
                     }
                 }
             }

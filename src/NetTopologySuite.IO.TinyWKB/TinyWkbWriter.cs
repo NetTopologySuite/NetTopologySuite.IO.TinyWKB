@@ -210,22 +210,22 @@ namespace NetTopologySuite.IO
         private void WritePoint(BinaryWriter writer, CoordinateSequenceWriter csWriter, Point point)
         {
             // We don't write bounding boxes for points. Period.
-            csWriter.Write(writer, point.CoordinateSequence, 1);
+            csWriter.Write(writer, point.CoordinateSequence);
         }
 
         private void WriteLineString(BinaryWriter writer, CoordinateSequenceWriter csWriter, LineString lineString)
         {
             WriteBoundingBox(writer, csWriter, lineString);
-            csWriter.Write(writer, lineString.CoordinateSequence, 2, writeCount: true);
+            csWriter.Write(writer, lineString.CoordinateSequence, writeCount: true);
         }
 
         private void WritePolygon(BinaryWriter writer, CoordinateSequenceWriter csWriter, Polygon polygon, bool omitBoundingBox = false)
         {
             if (!omitBoundingBox) WriteBoundingBox(writer, csWriter, polygon);
             writer.Write(VarintBitConverter.GetVarintBytes((uint)(1 + polygon.NumInteriorRings)));
-            csWriter.Write(writer, polygon.Shell.CoordinateSequence, 3, skipLastCoordinate: true, writeCount: true);
+            csWriter.Write(writer, polygon.Shell.CoordinateSequence, skipLastCoordinate: true, writeCount: true);
             for (int i = 0; i < polygon.NumInteriorRings; i++)
-                csWriter.Write(writer, polygon.GetInteriorRingN(i).CoordinateSequence, 3, skipLastCoordinate: true, writeCount: true);
+                csWriter.Write(writer, polygon.GetInteriorRingN(i).CoordinateSequence, skipLastCoordinate: true, writeCount: true);
         }
 
         private void WriteMultiPoint(BinaryWriter writer, CoordinateSequenceWriter csWriter, MultiPoint multiPoint, long[] idList)
@@ -234,7 +234,7 @@ namespace NetTopologySuite.IO
             writer.Write(VarintBitConverter.GetVarintBytes((uint)multiPoint.NumGeometries));
             WriteIdList(writer, multiPoint, idList);
             for (int i = 0; i < multiPoint.NumGeometries; i++)
-                csWriter.Write(writer, ((Point)multiPoint.GetGeometryN(i)).CoordinateSequence, 1);
+                csWriter.Write(writer, ((Point)multiPoint.GetGeometryN(i)).CoordinateSequence);
         }
 
         private void WriteMultiLineString(BinaryWriter writer, CoordinateSequenceWriter csWriter,
@@ -244,7 +244,7 @@ namespace NetTopologySuite.IO
             writer.Write(VarintBitConverter.GetVarintBytes((uint)multiLineString.NumGeometries));
             WriteIdList(writer, multiLineString, idList);
             for (int i = 0; i < multiLineString.NumGeometries; i++)
-                csWriter.Write(writer, ((LineString)multiLineString.GetGeometryN(i)).CoordinateSequence, 2, writeCount: true);
+                csWriter.Write(writer, ((LineString)multiLineString.GetGeometryN(i)).CoordinateSequence, writeCount: true);
         }
 
         private void WriteMultiPolygon(BinaryWriter writer, CoordinateSequenceWriter csWriter,
