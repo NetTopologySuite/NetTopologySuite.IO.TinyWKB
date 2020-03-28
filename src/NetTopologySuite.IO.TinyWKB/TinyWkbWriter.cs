@@ -4,7 +4,6 @@ using System.IO;
 using System.Text;
 using NetTopologySuite.DataStructures;
 using NetTopologySuite.Geometries;
-using NetTopologySuite.Operation.Distance;
 
 namespace NetTopologySuite.IO
 {
@@ -211,22 +210,22 @@ namespace NetTopologySuite.IO
         private void WritePoint(BinaryWriter writer, CoordinateSequenceWriter csWriter, Point point)
         {
             // We don't write bounding boxes for points. Period.
-            csWriter.Write(writer, point.CoordinateSequence, 0, 1);
+            csWriter.Write(writer, point.CoordinateSequence, 1);
         }
 
         private void WriteLineString(BinaryWriter writer, CoordinateSequenceWriter csWriter, LineString lineString)
         {
             WriteBoundingBox(writer, csWriter, lineString);
-            csWriter.Write(writer, lineString.CoordinateSequence, 0, 2);
+            csWriter.Write(writer, lineString.CoordinateSequence, 2, writeCount: true);
         }
 
         private void WritePolygon(BinaryWriter writer, CoordinateSequenceWriter csWriter, Polygon polygon, bool omitBoundingBox = false)
         {
             if (!omitBoundingBox) WriteBoundingBox(writer, csWriter, polygon);
             writer.Write(VarintBitConverter.GetVarintBytes((uint)(1 + polygon.NumInteriorRings)));
-            csWriter.Write(writer, polygon.Shell.CoordinateSequence, 1, 3);
+            csWriter.Write(writer, polygon.Shell.CoordinateSequence, 3, skipLastCoordinate: true, writeCount: true);
             for (int i = 0; i < polygon.NumInteriorRings; i++)
-                csWriter.Write(writer, polygon.GetInteriorRingN(i).CoordinateSequence, 1,3);
+                csWriter.Write(writer, polygon.GetInteriorRingN(i).CoordinateSequence, 3, skipLastCoordinate: true, writeCount: true);
         }
 
         private void WriteMultiPoint(BinaryWriter writer, CoordinateSequenceWriter csWriter, MultiPoint multiPoint, long[] idList)
@@ -235,7 +234,7 @@ namespace NetTopologySuite.IO
             writer.Write(VarintBitConverter.GetVarintBytes((uint)multiPoint.NumGeometries));
             WriteIdList(writer, multiPoint, idList);
             for (int i = 0; i < multiPoint.NumGeometries; i++)
-                csWriter.Write(writer, ((Point)multiPoint.GetGeometryN(i)).CoordinateSequence, 0, 1);
+                csWriter.Write(writer, ((Point)multiPoint.GetGeometryN(i)).CoordinateSequence, 1);
         }
 
         private void WriteMultiLineString(BinaryWriter writer, CoordinateSequenceWriter csWriter,
@@ -245,7 +244,7 @@ namespace NetTopologySuite.IO
             writer.Write(VarintBitConverter.GetVarintBytes((uint)multiLineString.NumGeometries));
             WriteIdList(writer, multiLineString, idList);
             for (int i = 0; i < multiLineString.NumGeometries; i++)
-                csWriter.Write(writer, ((LineString)multiLineString.GetGeometryN(i)).CoordinateSequence, 0, 2);
+                csWriter.Write(writer, ((LineString)multiLineString.GetGeometryN(i)).CoordinateSequence, 2, writeCount: true);
         }
 
         private void WriteMultiPolygon(BinaryWriter writer, CoordinateSequenceWriter csWriter,
@@ -268,7 +267,6 @@ namespace NetTopologySuite.IO
             for (int i = 0; i < gc.NumGeometries; i++)
             {
                 Write(writer, gc.GetGeometryN(i));
-                csWriter.InitPrevCoordinate();
             }
         }
 
@@ -276,12 +274,10 @@ namespace NetTopologySuite.IO
         {
             if (!EmitBoundingBox) return;
 
-            var minMaxFilter = new MinMaxFilter(csWriter.Dimension, csWriter.Measures);
+            var minMaxFilter = new MinMaxFilter(csWriter.OutputOrdinates);
             geometry.Apply(minMaxFilter);
 
-            for (int i = 0; i < csWriter.Dimension; i++)
-                WriteInterval(writer, minMaxFilter[i], csWriter.Scales[i]);
-
+            csWriter.WriteIntervals(writer, minMaxFilter.Intervals);
         }
 
         private static long _nextId = 1;
@@ -358,26 +354,16 @@ namespace NetTopologySuite.IO
             return idList;
         }
 
-        private void WriteInterval(BinaryWriter writer, Interval interval, double scale)
-        {
-            long last = 0;
-            long encValue = CoordinateSequenceWriter.EncodeOrdinate(interval.Min, scale, ref last);
-            writer.Write(VarintBitConverter.GetVarintBytes(encValue));
-            encValue = CoordinateSequenceWriter.EncodeOrdinate(interval.Max, scale, ref last);
-            writer.Write(VarintBitConverter.GetVarintBytes(encValue));
-        }
-
         private class MinMaxFilter : ICoordinateSequenceFilter
         {
-            private readonly int _dimension, _measureIndex;
+            private readonly Ordinate[] _outputOrdinates;
             private readonly Interval[] _intervals;
 
-            public MinMaxFilter(int dimension, int measures)
+            public MinMaxFilter(Ordinate[] outputOrdinates)
             {
-                _dimension = dimension - measures;
-                _measureIndex = measures > 0 ? _dimension : -1;
-                _intervals = new Interval[dimension];
-                for (int i = 0; i < dimension; i++)
+                _outputOrdinates = outputOrdinates;
+                _intervals = new Interval[_outputOrdinates.Length];
+                for (int i = 0; i < _intervals.Length; i++)
                     _intervals[i] = Interval.Create();
             }
 
@@ -385,15 +371,16 @@ namespace NetTopologySuite.IO
 
             public bool GeometryChanged => false;
 
+            public ReadOnlySpan<Interval> Intervals => _intervals;
+
             public void Filter(CoordinateSequence seq, int i)
             {
-                for (int j = 0; j < _dimension; j++)
-                    _intervals[j] = _intervals[j].ExpandedByValue(seq.GetOrdinate(i, j));
-                if (_measureIndex >= 0)
-                    _intervals[_measureIndex] = _intervals[_measureIndex].ExpandedByValue(seq.GetM(i));
+                for (int dim = 0; dim < _outputOrdinates.Length; dim++)
+                {
+                    double val = seq.GetOrdinate(i, _outputOrdinates[dim]);
+                    _intervals[dim] = _intervals[dim].ExpandedByValue(val);
+                }
             }
-
-            public Interval this[int dimension] { get { return _intervals[dimension]; } }
         }
 
 
