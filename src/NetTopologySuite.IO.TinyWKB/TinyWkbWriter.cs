@@ -274,7 +274,7 @@ namespace NetTopologySuite.IO
         {
             if (!EmitBoundingBox) return;
 
-            var minMaxFilter = new MinMaxFilter(csWriter.OutputOrdinates);
+            var minMaxFilter = new MinMaxFilter(csWriter.Dimension);
             geometry.Apply(minMaxFilter);
 
             csWriter.WriteIntervals(writer, minMaxFilter.Intervals);
@@ -356,13 +356,11 @@ namespace NetTopologySuite.IO
 
         private class MinMaxFilter : ICoordinateSequenceFilter
         {
-            private readonly Ordinate[] _outputOrdinates;
             private readonly Interval[] _intervals;
 
-            public MinMaxFilter(Ordinate[] outputOrdinates)
+            public MinMaxFilter(int dimension)
             {
-                _outputOrdinates = outputOrdinates;
-                _intervals = new Interval[_outputOrdinates.Length];
+                _intervals = new Interval[dimension];
                 for (int i = 0; i < _intervals.Length; i++)
                     _intervals[i] = Interval.Create();
             }
@@ -375,9 +373,9 @@ namespace NetTopologySuite.IO
 
             public void Filter(CoordinateSequence seq, int i)
             {
-                for (int dim = 0; dim < _outputOrdinates.Length; dim++)
+                for (int dim = 0; dim < _intervals.Length; dim++)
                 {
-                    double val = seq.GetOrdinate(i, _outputOrdinates[dim]);
+                    double val = seq.GetOrdinate(i, dim);
                     _intervals[dim] = _intervals[dim].ExpandedByValue(val);
                 }
             }

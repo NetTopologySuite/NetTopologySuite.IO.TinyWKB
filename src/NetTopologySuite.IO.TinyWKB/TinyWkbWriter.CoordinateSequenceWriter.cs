@@ -10,45 +10,33 @@ namespace NetTopologySuite.IO
     {
         private class CoordinateSequenceWriter
         {
-            private static readonly Ordinate[] OrdinatesXY = new Ordinate[] { Ordinate.X, Ordinate.Y };
-
-            private static readonly Ordinate[] OrdinatesXYZ = new Ordinate[] { Ordinate.X, Ordinate.Y, Ordinate.Z };
-
-            private static readonly Ordinate[] OrdinatesXYM = new Ordinate[] { Ordinate.X, Ordinate.Y, Ordinate.M };
-
-            private static readonly Ordinate[] OrdinatesXYZM = new Ordinate[] { Ordinate.X, Ordinate.Y, Ordinate.Z, Ordinate.M };
+            private readonly double[] _scales;
 
             private readonly long[] _prevCoordinate;
-
-            private readonly double[] _scales;
 
             public CoordinateSequenceWriter(TinyWkbHeader header)
             {
                 if (!header.HasExtendedPrecisionInformation || !(header.HasZ | header.HasM))
                 {
                     _scales = new[] { header.ScaleX(), header.ScaleY() };
-                    OutputOrdinates = OrdinatesXY;
                 }
                 else if (header.HasZ && !header.HasM)
                 {
                     _scales = new[] { header.ScaleX(), header.ScaleY(), header.ScaleZ() };
-                    OutputOrdinates = OrdinatesXYZ;
                 }
                 else if (!header.HasZ && header.HasM)
                 {
                     _scales = new[] { header.ScaleX(), header.ScaleY(), header.ScaleM() };
-                    OutputOrdinates = OrdinatesXYM;
                 }
                 else
                 {
                     _scales = new[] { header.ScaleX(), header.ScaleY(), header.ScaleZ(), header.ScaleM() };
-                    OutputOrdinates = OrdinatesXYZM;
                 }
 
-                _prevCoordinate = new long[OutputOrdinates.Length];
+                _prevCoordinate = new long[_scales.Length];
             }
 
-            public Ordinate[] OutputOrdinates { get; }
+            public int Dimension => _scales.Length;
 
             public void Write(BinaryWriter writer, CoordinateSequence sequence, bool skipLastCoordinate = false, bool writeCount = false)
             {
@@ -63,20 +51,12 @@ namespace NetTopologySuite.IO
                 ReadOnlySpan<double> scales = _scales;
                 Span<long> prevCoordinate = _prevCoordinate;
 
-                Span<int> ordinateIndexes = stackalloc int[OutputOrdinates.Length];
-                for (int i = 0; i < OutputOrdinates.Length; i++)
-                {
-                    sequence.TryGetOrdinateIndex(OutputOrdinates[i], out ordinateIndexes[i]);
-                }
-
                 for (int i = 0; i < count; i++)
                 {
                     // Encode ordinate values
-                    for (int dim = 0; dim < ordinateIndexes.Length; dim++)
+                    for (int dim = 0; dim < scales.Length; dim++)
                     {
-                        double val = ordinateIndexes[dim] == -1
-                            ? double.NaN
-                            : sequence.GetOrdinate(i, ordinateIndexes[dim]);
+                        double val = sequence.GetOrdinate(i, dim);
                         long enc = EncodeOrdinate(val, scales[dim], ref prevCoordinate[dim]);
                         writer.Write(VarintBitConverter.GetVarintBytes(enc));
                     }
