@@ -46,7 +46,7 @@ namespace NetTopologySuite.IO.Test
             }
 
             TestContext.WriteLine();
-            TestContext.WriteLine($"Read  '{g.AsText()}' from '{hexString}'.");
+            TestContext.WriteLine($"Read  '{g.AsText()}' from '{hexString.Substring(2)}'.");
 
             var wrtr = new TinyWkbWriter(precisionXY: header.PrecisionXY,
                 header.HasZ, header.PrecisionZ, header.HasM, header.PrecisionM,
