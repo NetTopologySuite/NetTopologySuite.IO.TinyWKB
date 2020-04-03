@@ -18,6 +18,7 @@ namespace NetTopologySuite.IO.Test
         private readonly NtsGeometryServices _ntsGeometryServices;
         private readonly WKBReader _wkbReader;
         private readonly WKTReader _wktReader;
+        private readonly WKTWriter _wktWriter = new WKTWriter(4);
 
         public RoundTripWkxTests(CsFactoryType csFactoryType)
         {
@@ -50,9 +51,13 @@ namespace NetTopologySuite.IO.Test
         }
 
         [TestCase("POINT (10 10)")]
-        [TestCase("LINESTRING (10 10, 15 10, 20 15, 25 20)")]
+        [TestCase("LINESTRING (10 10, 15 10, 20 15, 25 15)")]
         [TestCase("POLYGON ((10 10, 15 10, 15 15, 10 15, 10 10))")]
         [TestCase("POLYGON ((10 10, 15 10, 15 15, 10 15, 10 10), (11 11, 11 14, 14 14, 14 11, 11 11))")]
+        [TestCase("MULTIPOINT ((10 10), (15 10), (20 15), (25 15))")]
+        [TestCase("MULTILINESTRING ((10 10, 15 10, 20 15, 25 15), (9 11, 14 11, 19 16, 24 16))")]
+        [TestCase("MULTIPOLYGON (((10 10, 15 10, 15 15, 10 15, 10 10), (11 11, 11 14, 14 14, 14 11, 11 11)), ((30 10, 35 10, 35 15, 30 15, 30 10)))")]
+        [TestCase("GEOMETRYCOLLECTION (POINT (10 10), LINESTRING (10 10, 15 10, 20 15, 25 15), POLYGON ((10 10, 15 10, 15 15, 10 15, 10 10), (11 11, 11 14, 14 14, 14 11, 11 11)))")]
         public void TestWkx(string wktOrWkb)
         {
 
@@ -66,35 +71,38 @@ namespace NetTopologySuite.IO.Test
             Test3DM(geomS);
         }
 
-        private void Test2D(Geometry geomS)
-        {
-            var twkbWriter = new TinyWkbWriter();
-            byte[] bytes = twkbWriter.Write(geomS);
-            var twkbReader = new TinyWkbReader(_ntsGeometryServices.CreateGeometryFactory());
-            var geomD = twkbReader.Read(bytes);
-
-            Check(geomS, geomD, Ordinates.XY);
-        }
-
-
-        [Ignore("No 'Known to fail' tests here")]
+        [Ignore("These tests are known to fail, need to be investigated")]
+        //[TestCase("")]
         public void TestWkxFailure(string wktOrWkb)
         {
 
             var geomS = wktOrWkb.StartsWith("0x")
                 ? _wkbReader.Read(WKBReader.HexToBytes(wktOrWkb.Substring(2)))
                 : _wktReader.Read(wktOrWkb);
+
             //Test2DM(geomS);
         }
 
+        private void Test2D(Geometry geomS)
+        {
+            TestContext.WriteLine(_wktWriter.Write(geomS));
+            var twkbWriter = new TinyWkbWriter(emitZ: false, emitM: false);
+            byte[] bytes = twkbWriter.Write(geomS);
+            CreatePostGisConformanceCheckSql("2D", geomS, bytes);
+            var twkbReader = new TinyWkbReader(_ntsGeometryServices.CreateGeometryFactory());
+            var geomD = twkbReader.Read(bytes);
+
+            Check(geomS, geomD, Ordinates.XY);
+        }
 
         private void Test2DM(Geometry geomS)
         {
             if (CoordinateArrays.Measures(geomS.Coordinates) == 0)
                 geomS = AddOrdinates(geomS, Ordinate.M);
 
-            var twkbWriter = new TinyWkbWriter(emitM: true);
+            var twkbWriter = new TinyWkbWriter(emitZ:false);
             byte[] bytes = twkbWriter.Write(geomS);
+            CreatePostGisConformanceCheckSql("2DM", geomS, bytes);
             var twkbReader = new TinyWkbReader(_ntsGeometryServices.CreateGeometryFactory());
             var geomD = twkbReader.Read(bytes);
 
@@ -106,8 +114,9 @@ namespace NetTopologySuite.IO.Test
             if (CoordinateArrays.Measures(geomS.Coordinates) == 0)
                 geomS = AddOrdinates(geomS, Ordinate.Z);
 
-            var twkbWriter = new TinyWkbWriter(emitZ: true);
+            var twkbWriter = new TinyWkbWriter(emitM: false);
             byte[] bytes = twkbWriter.Write(geomS);
+            CreatePostGisConformanceCheckSql("3D", geomS, bytes);
             var twkbReader = new TinyWkbReader(_ntsGeometryServices.CreateGeometryFactory());
             var geomD = twkbReader.Read(bytes);
 
@@ -118,8 +127,9 @@ namespace NetTopologySuite.IO.Test
             if (CoordinateArrays.Measures(geomS.Coordinates) == 0)
                 geomS = AddOrdinates(geomS, Ordinate.Z, Ordinate.M);
 
-            var twkbWriter = new TinyWkbWriter(emitZ: true, emitM:true);
+            var twkbWriter = new TinyWkbWriter();
             byte[] bytes = twkbWriter.Write(geomS);
+            CreatePostGisConformanceCheckSql("3DM", geomS, bytes);
             var twkbReader = new TinyWkbReader(_ntsGeometryServices.CreateGeometryFactory());
             var geomD = twkbReader.Read(bytes);
 
@@ -335,6 +345,12 @@ namespace NetTopologySuite.IO.Test
                     Assert.That(csDi.GetM(i), Is.EqualTo(csSi.GetM(i)).Within(1E-5));
 
             }
+        }
+
+        private void CreatePostGisConformanceCheckSql(string dim, Geometry geometry, byte[] twkb)
+        {
+            const string union = "UNION ";
+            TestContext.WriteLine($"{(dim == "2D" ? string.Empty : union)}SELECT '{dim}' AS dimension, ST_Equals(ST_GeomFromText('{_wktWriter.Write(geometry)}'), ST_GeomFromTWKB(E'\\\\x{WKBWriter.ToHex(twkb)}')) AS conform{(dim != "3DM" ? string.Empty : ";")}");
         }
     }
 }

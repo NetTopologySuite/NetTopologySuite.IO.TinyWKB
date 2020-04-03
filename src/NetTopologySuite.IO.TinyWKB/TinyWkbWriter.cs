@@ -4,7 +4,6 @@ using System.IO;
 using System.Text;
 using NetTopologySuite.DataStructures;
 using NetTopologySuite.Geometries;
-using NetTopologySuite.Operation.Distance;
 
 namespace NetTopologySuite.IO
 {
@@ -25,9 +24,18 @@ namespace NetTopologySuite.IO
         /// <param name="emitBoundingBox"></param>
         /// <param name="emitIdList"></param>
         public TinyWkbWriter(int precisionXY = 7, 
-            bool emitZ = false, int precisionZ = 3, bool emitM = false, int precisionM = 3, 
+            bool emitZ = true, int precisionZ = 7, bool emitM = true, int precisionM = 7, 
             bool emitSize = false, bool emitBoundingBox = true, bool emitIdList = false)
         {
+            if (precisionXY < -7 || 7 < precisionXY)
+                throw new ArgumentOutOfRangeException(nameof(precisionXY), precisionXY, "Geometry precision must be in the range [-7, 7]");
+
+            if (precisionZ < 0 || 7 < precisionZ)
+                throw new ArgumentOutOfRangeException(nameof(precisionZ), precisionZ, "Z-ordinate precision must be in the range [0, 7]");
+
+            if (precisionM < 0 || 7 < precisionM)
+                throw new ArgumentOutOfRangeException(nameof(precisionM), precisionM, "M-ordinate precision must be in the range [0, 7]");
+
             PrecisionXY = precisionXY;
             EmitZ = emitZ;
             PrecisionZ = precisionZ;

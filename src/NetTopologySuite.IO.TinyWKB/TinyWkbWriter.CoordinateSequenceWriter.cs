@@ -26,13 +26,11 @@ namespace NetTopologySuite.IO
                 {
                     Ordinates = new[] { Ordinate.X, Ordinate.Y, Ordinate.M };
                     Scales = new[] { header.ScaleX(), header.ScaleY(), header.ScaleM() };
-                    Measures = 1;
                 }
                 else
                 {
                     Ordinates = new[] { Ordinate.X, Ordinate.Y, Ordinate.Z, Ordinate.M };
                     Scales = new[] { header.ScaleX(), header.ScaleY(), header.ScaleZ(), header.ScaleM() };
-                    Measures = 1;
                 }
 
                 _prevCoordinate = new long[Dimension];
@@ -47,20 +45,21 @@ namespace NetTopologySuite.IO
             }
 
             /// <summary>
-            /// Gets the number of measure values to write
-            /// </summary>
-            public int Measures { get; }
-
-            /// <summary>
             /// Gets a vector containing the scale factors for each ordinate
             /// </summary>
             public double[] Scales { get; }
 
             /// <summary>
-            /// Gets a vector containing the scale factors for each ordinate
+            /// Gets a vector containing the <see cref="Ordinate"/>s present for each coordinate
             /// </summary>
             public Ordinate[] Ordinates { get; }
 
+            /// <summary>
+            /// Writes the coordinate sequence
+            /// </summary>
+            /// <param name="writer">The writer</param>
+            /// <param name="sequence">The sequence</param>
+            /// <param name="skipLast">A flag indicating if the last coordinate should be skipped.</param>
             public void Write(BinaryWriter writer, CoordinateSequence sequence, bool skipLast)
             {
                 if (sequence == null || sequence.Count == 0)

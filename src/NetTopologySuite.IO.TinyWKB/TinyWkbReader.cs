@@ -1,13 +1,10 @@
-
 using System;
+using System.Collections.Generic;
 using System.IO;
-using System.Runtime.CompilerServices;
 using System.Text;
 using NetTopologySuite.DataStructures;
 using NetTopologySuite.Geometries;
 using NetTopologySuite.Utilities;
-
-//[assembly: InternalsVisibleTo("NetTopologySuite.IO.TinyWKB.Test")]
 
 namespace NetTopologySuite.IO
 {
@@ -62,7 +59,7 @@ namespace NetTopologySuite.IO
         /// <param name="position">The starting position</param>
         /// <param name="seekOrigin">A value indicating how to interpret <paramref name="position"/></param>
         /// <returns>A geometry</returns>
-        public Geometry Read(byte[] buffer, out long[] idList, long position = 0, SeekOrigin seekOrigin = SeekOrigin.Begin)
+        public Geometry Read(byte[] buffer, out IList<long> idList, long position = 0, SeekOrigin seekOrigin = SeekOrigin.Begin)
         {
             using (var ms = new MemoryStream(buffer))
             {
@@ -88,7 +85,7 @@ namespace NetTopologySuite.IO
         /// <param name="stream">The input stream</param>
         /// <param name="idList">An array of identifiers if present</param>
         /// <returns>A geometry</returns>
-        public Geometry Read(Stream stream, out long[] idList)
+        public Geometry Read(Stream stream, out IList<long> idList)
         {
             using (var br = new BinaryReader(stream, Encoding.UTF8, true))
                 return Read(br, out idList, true);
@@ -111,7 +108,7 @@ namespace NetTopologySuite.IO
         /// <param name="idList">An array of identifiers if present</param>
         /// <param name="exportIdList">A flag indicating if the list of ids should be exported.</param>
         /// <returns>A geometry</returns>
-        public Geometry Read(BinaryReader reader, out long[] idList, bool exportIdList = false)
+        private Geometry Read(BinaryReader reader, out IList<long> idList, bool exportIdList = false)
         {
             idList = null;
 
@@ -244,7 +241,7 @@ namespace NetTopologySuite.IO
         /// </summary>
         public event EventHandler<IdentifiersEventArgs> IdentifiersProvided;
 
-        private MultiPoint ReadMultiPoint(BinaryReader reader, TinyWkbHeader header, CoordinateSequenceReader csReader, out long[] idList)
+        private MultiPoint ReadMultiPoint(BinaryReader reader, TinyWkbHeader header, CoordinateSequenceReader csReader, out IList<long> idList)
         {
             int numPoints = (int) ReadUVarint(reader);
             idList = ReadIdList(reader, header, numPoints);
@@ -255,7 +252,7 @@ namespace NetTopologySuite.IO
         }
 
         private MultiLineString ReadMultiLineString(BinaryReader reader, TinyWkbHeader header,
-            CoordinateSequenceReader csReader, out long[] idList)
+            CoordinateSequenceReader csReader, out IList<long> idList)
         {
             int numLineStrings = (int)ReadUVarint(reader);
             idList = ReadIdList(reader, header, numLineStrings);
@@ -266,7 +263,7 @@ namespace NetTopologySuite.IO
             return _factory.CreateMultiLineString(lineStrings);
         }
         private MultiPolygon ReadMultiPolygon(BinaryReader reader, TinyWkbHeader header,
-            CoordinateSequenceReader csReader, out long[] idList)
+            CoordinateSequenceReader csReader, out IList<long> idList)
         {
             int numPolygons = (int)ReadUVarint(reader);
             idList = ReadIdList(reader, header, numPolygons);
@@ -278,7 +275,7 @@ namespace NetTopologySuite.IO
             return _factory.CreateMultiPolygon(polygons);
         }
 
-        private GeometryCollection ReadGeometryCollection(BinaryReader reader, TinyWkbHeader header, out long[] idList)
+        private GeometryCollection ReadGeometryCollection(BinaryReader reader, TinyWkbHeader header, out IList<long> idList)
         {
             int numGeometries = (int) ReadUVarint(reader);
             var geometries = new Geometry[numGeometries];

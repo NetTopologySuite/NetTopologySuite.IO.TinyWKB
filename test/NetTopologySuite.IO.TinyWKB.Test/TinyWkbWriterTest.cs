@@ -60,7 +60,7 @@ namespace NetTopologySuite.IO.Test
             _dimension = dimension;
         }
 
-        private readonly Random Rnd = new Random(13);
+        private static readonly Random Rnd = new Random(13);
 
         private Coordinate CreateCoordinate(double x, double y)
         {
@@ -292,7 +292,7 @@ namespace NetTopologySuite.IO.Test
                 Assert.That(args.IdList[i], Is.EqualTo(101 + i));
         }
 
-        private void CheckIds(GeometryCollection gc, IdFrom idFrom, long[] idList = null)
+        private void CheckIds(GeometryCollection gc, IdFrom idFrom, IList<long> idList = null)
         {
             if (!_emitIdList) return;
             if (idFrom == IdFrom.Event)
@@ -349,7 +349,7 @@ namespace NetTopologySuite.IO.Test
                 rdr.IdentifiersProvided += handler;
 
             Geometry readGeometry = null;
-            long[] idList = null;
+            IList<long> idList = null;
             if (idFrom != IdFrom.Argument)
                 Assert.That(() => readGeometry = rdr.Read(twkbData), Throws.Nothing);
             else
